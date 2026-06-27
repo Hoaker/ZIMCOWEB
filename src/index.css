@@ -1,0 +1,179 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-headline: "Manrope", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-label: "Inter", sans-serif;
+
+  --color-secondary: #385e9d;
+  --color-error: #ba1a1a;
+  --color-surface-tint: #006d40;
+  --color-on-primary-fixed-variant: #00522f;
+  --color-primary-fixed: #8df8b7;
+  --color-on-tertiary-fixed-variant: #004c6b;
+  --color-on-surface: #191c1d;
+  --color-surface-container-low: #f3f4f5;
+  --color-on-error-container: #93000a;
+  --color-primary-fixed-dim: #70db9d;
+  --color-on-tertiary-container: #e7f4ff;
+  --color-on-error: #ffffff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-highest: #e1e3e4;
+  --color-outline: #707a6c;
+  --color-secondary-fixed: #d7e2ff;
+  --color-primary-container: #007e4b;
+  --color-on-background: #191c1d;
+  --color-on-primary: #ffffff;
+  --color-tertiary-fixed-dim: #82cfff;
+  --color-on-secondary-fixed-variant: #1b4683;
+  --color-surface: #f8f9fa;
+  --color-on-surface-variant: #40493d;
+  --color-background: #f8f9fa;
+  --color-on-tertiary-fixed: #001e2d;
+  --color-on-tertiary: #ffffff;
+  --color-on-primary-container: #c4ffd6;
+  --color-surface-dim: #d9dadb;
+  --color-surface-container: #edeeef;
+  --color-error-container: #ffdad6;
+  --color-tertiary-container: #0076a3;
+  --color-surface-container-high: #e7e8e9;
+  --color-inverse-surface: #2e3132;
+  --color-on-secondary-container: #1f4886;
+  --color-on-primary-fixed: #002110;
+  --color-inverse-primary: #70db9d;
+  --color-secondary-fixed-dim: #abc7ff;
+  --color-secondary-container: #95b9fe;
+  --color-on-secondary-fixed: #001b3f;
+  --color-on-secondary: #ffffff;
+  --color-primary: #00633a;
+  --color-outline-variant: #bfcaba;
+  --color-inverse-on-surface: #f0f1f2;
+  --color-surface-bright: #f8f9fa;
+  --color-tertiary: #005c81;
+  --color-tertiary-fixed: #c6e7ff;
+  --color-surface-variant: #e1e3e4;
+}
+
+/* Dark mode theme adjustments */
+html.dark {
+  color-scheme: dark;
+  --color-background: #090d16;
+  --color-surface: #090d16;
+  --color-on-background: #f1f5f9;
+  --color-on-surface: #f1f5f9;
+
+  --color-surface-container-lowest: #0d121f;
+  --color-surface-container-low: #131a2c;
+  --color-surface-container: #1b243b;
+  --color-surface-container-high: #242f4c;
+  --color-surface-container-highest: #2d3b5e;
+
+  --color-primary: #10b981;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #064e3b;
+  --color-on-primary-container: #d1fae5;
+
+  --color-secondary: #60a5fa;
+  --color-on-secondary: #0f172a;
+
+  --color-on-surface-variant: #94a3b8;
+  --color-outline: #475569;
+  --color-outline-variant: #334155;
+}
+
+html.dark body {
+  background-color: #090d16 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Component overrides in Dark Mode */
+html.dark .bg-white {
+  background-color: #0d121f !important;
+}
+
+html.dark .text-slate-600 {
+  color: #94a3b8 !important;
+}
+
+html.dark .text-slate-700,
+html.dark .text-slate-800,
+html.dark .text-slate-900,
+html.dark .text-emerald-950,
+html.dark .text-emerald-950\/10,
+html.dark .text-emerald-900 {
+  color: #f1f5f9 !important;
+}
+
+html.dark .border-slate-100,
+html.dark .border-slate-200 {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+html.dark .divide-slate-100 > * + *,
+html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+html.dark .bg-slate-50,
+html.dark .bg-slate-50\/40,
+html.dark .bg-slate-50\/50,
+html.dark .bg-slate-50\/30 {
+  background-color: #131a2c !important;
+}
+
+html.dark .bg-slate-100 {
+  background-color: #1b243b !important;
+}
+
+html.dark .hover\:bg-slate-50:hover {
+  background-color: #1c253d !important;
+}
+
+html.dark footer {
+  background-color: #0d121f !important;
+  color: #cbd5e1 !important;
+}
+
+html.dark footer .text-slate-200,
+html.dark footer .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+@layer base {
+  body {
+    @apply bg-surface text-on-surface font-body;
+  }
+}
+
+.bg-glass {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+}
+
+html.dark .bg-glass,
+html.dark .glass-panel {
+  background: rgba(13, 18, 31, 0.8) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.asymmetric-bg {
+  clip-path: polygon(0 0, 100% 0, 100% 85%, 0% 100%);
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  display: inline-block;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
+  word-wrap: normal;
+  white-space: nowrap;
+  direction: ltr;
+}
