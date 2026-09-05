@@ -1,5 +1,6 @@
 {
   "name": "ZIMCO Co-operative Society",
-  "description": "Nigeria's leading zero-interest co-operative society empowering financial futures through ethical growth and collective strength.",
-  "requestFramePermissions": []
+  "description": "Nigeria's leading zero-interest co-operative society empowering financial futures through ethical growth, Muslim Community Account (MCA) management, and comprehensive treasury audit reporting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -150,7 +150,7 @@ export default function KYCOnboarding() {
     setTimeout(() => {
       setIsCameraScanning(false);
       setIsCameraActive(false);
-      handleFileUpload('selfieFile', 'LIVE_BIOMETRIC_MATRIX_CAPTURED.png');
+      handleFileUpload('selfieFile', 'live_photo_verification.png');
     }, 2800);
   };
 
@@ -179,14 +179,14 @@ export default function KYCOnboarding() {
     setStatus('submitted');
     setSubmittedAt(formattedDate);
     setApprovedAt(null);
-    setReviewerNotes('A security analyst will audit your passport and biometric hashes in adherence to NDPR metadata restrictions.');
+    setReviewerNotes('Our verification team will review your identity documents in accordance with Nigerian data privacy regulations.');
     
     saveToStorage(
       kycData, 
       'submitted', 
       formattedDate, 
       null, 
-      'A security analyst will audit your passport and biometric hashes in adherence to NDPR metadata restrictions.'
+      'Our verification team will review your identity documents in accordance with Nigerian data privacy regulations.'
     );
   };
 
@@ -208,22 +208,22 @@ export default function KYCOnboarding() {
     } else if (newStage === 'submitted') {
       setSubmittedAt(nowStr);
       setApprovedAt(null);
-      saveToStorage(kycData, 'submitted', nowStr, null, notes || 'Reviewer is auditing documents...');
+      saveToStorage(kycData, 'submitted', nowStr, null, notes || 'Verification team is reviewing documents...');
     } else if (newStage === 'failed') {
       setApprovedAt(null);
       saveToStorage(kycData, 'failed', submittedAt, null, notes || 'ID resolution too low. Re-upload scan.');
     } else if (newStage === 'verified') {
       setApprovedAt(nowStr);
-      saveToStorage(kycData, 'verified', submittedAt || nowStr, nowStr, notes || 'All biological structures match official state databases.');
+      saveToStorage(kycData, 'verified', submittedAt || nowStr, nowStr, notes || 'All documents match official government records.');
     }
   };
 
   // Progress Stepper Indicators
   const steps = [
-    { title: 'National Identity', desc: 'Secure document scan' },
-    { title: 'Facial Biometrics', desc: 'High-definition live scan' },
-    { title: 'Residency Verification', desc: 'Utility bill ledger matching' },
-    { title: 'Review & Attest', desc: 'Sovereign signature audit' }
+    { title: 'Identity Document', desc: 'Upload a valid ID card or passport' },
+    { title: 'Photo Verification', desc: 'Take a clear selfie photo' },
+    { title: 'Proof of Address', desc: 'Upload a recent utility bill' },
+    { title: 'Review & Submit', desc: 'Confirm your details' }
   ];
 
   return (
@@ -271,8 +271,8 @@ export default function KYCOnboarding() {
         <div className="lg:col-span-4 space-y-6">
           <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm space-y-8 sticky top-28">
             <div>
-              <h3 className="font-headline font-black text-slate-900 text-lg">Compliance Status</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Real-time surveillance ledger checks</p>
+              <h3 className="font-headline font-black text-slate-900 text-lg">Verification Status</h3>
+              <p className="text-xs text-slate-400 mt-0.5">Account verification progress</p>
             </div>
 
             {/* Stepper Steps UI */}
@@ -286,8 +286,8 @@ export default function KYCOnboarding() {
                   <Check size={10} />
                 </div>
                 <div className="space-y-0.5 ml-4">
-                  <p className="text-xs font-bold text-slate-900">Form Draft Prepared</p>
-                  <p className="text-[10px] text-slate-400 font-mono">Completed on draft entry</p>
+                  <p className="text-xs font-bold text-slate-900">Form Started</p>
+                  <p className="text-[10px] text-slate-400 font-mono">In progress</p>
                 </div>
               </div>
 
@@ -302,15 +302,15 @@ export default function KYCOnboarding() {
                 </div>
                 <div className="space-y-0.5 ml-4">
                   <div className="flex items-center gap-1.5">
-                    <p className="text-xs font-bold text-slate-800">Review Submitted</p>
+                    <p className="text-xs font-bold text-slate-800">Submitted for Review</p>
                     {status === 'submitted' && (
                       <span className="px-1.5 py-0.5 bg-amber-50 text-amber-900 border border-amber-500/10 text-[8px] font-mono font-bold rounded">
-                        PENDING AUDIT
+                        UNDER REVIEW
                       </span>
                     )}
                   </div>
                   <p className="text-[10px] text-slate-400 font-mono">
-                    {submittedAt ? `Lodged: ${submittedAt}` : 'Awaiting document files'}
+                    {submittedAt ? `Submitted: ${submittedAt}` : 'Waiting for submission'}
                   </p>
                 </div>
               </div>
@@ -328,8 +328,8 @@ export default function KYCOnboarding() {
                    <ShieldCheck size={10} />}
                 </div>
                 <div className="space-y-0.5 ml-4">
-                  <p className="text-xs font-bold text-slate-850 text-slate-800">Technical Audit Pass</p>
-                  <p className="text-[10px] text-slate-450 text-slate-400 font-mono">Forensic matching threshold check</p>
+                  <p className="text-xs font-bold text-slate-800">Document Review</p>
+                  <p className="text-[10px] text-slate-400 font-mono">Checking submitted details</p>
                 </div>
               </div>
 
@@ -345,30 +345,30 @@ export default function KYCOnboarding() {
                 <div className="space-y-0.5 ml-4">
                   <div className="flex items-center gap-2">
                     <p className={`text-xs font-extrabold ${status === 'verified' ? 'text-emerald-700' : status === 'failed' ? 'text-rose-700' : 'text-slate-500'}`}>
-                      {status === 'verified' ? 'Cooperative Verified' : status === 'failed' ? 'KYC Appeal Active' : 'Verified Membership'}
+                      {status === 'verified' ? 'Fully Verified' : status === 'failed' ? 'Needs Resubmission' : 'Verified Member'}
                     </p>
                     {status === 'verified' && (
                       <Sparkles size={12} className="text-emerald-600 animate-bounce" />
                     )}
                   </div>
                   <p className="text-[10px] text-slate-400 font-mono">
-                    {approvedAt ? `Completed: ${approvedAt}` : 'Subsequent audit check'}
+                    {approvedAt ? `Approved: ${approvedAt}` : 'Final approval step'}
                   </p>
                 </div>
               </div>
 
             </div>
 
-            {/* Forensic logs container */}
+            {/* Review notes container */}
             {reviewerNotes && (
               <div className={`p-4 rounded-2xl border text-xs leading-relaxed font-mono ${
-                status === 'verified' ? 'bg-emerald-50/50 border-emerald-500/10 text-emerald-805 text-emerald-800' :
+                status === 'verified' ? 'bg-emerald-50/50 border-emerald-500/10 text-emerald-800' :
                 status === 'failed' ? 'bg-rose-50/50 border-rose-500/10 text-rose-900' :
                 'bg-slate-50 border-slate-200/50 text-slate-600'
               }`}>
                 <span className="font-extrabold block uppercase text-[9px] tracking-wider mb-1.5 flex items-center gap-1">
                   <AlertCircle size={12} />
-                  <span>Auditor Audit Trail Logs</span>
+                  <span>Review Notes</span>
                 </span>
                 <p className="text-[10px] font-medium leading-normal">{reviewerNotes}</p>
               </div>
@@ -377,7 +377,7 @@ export default function KYCOnboarding() {
             {/* Core Privacy Compliance Text */}
             <div className="pt-4 border-t border-slate-100 flex items-center gap-3 text-[10px] text-slate-400 font-mono leading-normal">
               <Lock size={16} className="text-emerald-700 shrink-0" />
-              <span>Sovereign security matrices aligned to NITDA compliance bounds. Verified data remains fully anonymized.</span>
+              <span>Your personal data is encrypted and protected under national data privacy guidelines.</span>
             </div>
 
           </div>
@@ -406,19 +406,19 @@ export default function KYCOnboarding() {
                 </div>
 
                 <div className="space-y-3 max-w-lg">
-                  <h3 className="font-headline font-black text-2xl text-slate-900">Your Co-op Audit is Under Review</h3>
+                  <h3 className="font-headline font-black text-2xl text-slate-900">Your Verification is Under Review</h3>
                   <p className="text-sm text-slate-500 font-medium leading-relaxed">
-                    We received your official passport credentials and biometric frames. Our compliance analysts verify files manually against public database registries. This takes around 30 minutes.
+                    We have received your identity documents and photo. Our team is verifying your details against official records. This usually takes around 30 minutes.
                   </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 max-w-sm w-full pt-4 font-mono text-[10px] text-slate-400 border-t border-slate-100">
                   <div className="text-left bg-slate-50 p-3.5 rounded-2xl border border-slate-150">
-                    <span className="block font-bold">DISPATCH REFERENCE</span>
+                    <span className="block font-bold">REFERENCE ID</span>
                     <span className="text-slate-800 font-black tracking-wider block mt-1">ZMC-KYC-{Math.floor(100000 + Math.random()*900000)}</span>
                   </div>
                   <div className="text-left bg-slate-50 p-3.5 rounded-2xl border border-slate-150">
-                    <span className="block font-bold">FORENSIC REGISTRY</span>
+                    <span className="block font-bold">VERIFICATION SYSTEM</span>
                     <span className="text-emerald-800 font-black block mt-1">NIN-SECURE-API</span>
                   </div>
                 </div>
@@ -428,7 +428,7 @@ export default function KYCOnboarding() {
                   className="px-6 py-3 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <RefreshCw size={12} />
-                  <span>Edit or Recalibrate Files</span>
+                  <span>Edit or Re-upload Documents</span>
                 </button>
               </motion.div>
             )}
@@ -452,11 +452,11 @@ export default function KYCOnboarding() {
 
                 <div className="space-y-3 max-w-lg">
                   <div className="inline-flex gap-1 bg-emerald-50 text-emerald-800 border border-emerald-500/10 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                    <span>Active NDPR Compliance Seal</span>
+                    <span>Verified Account</span>
                   </div>
-                  <h3 className="font-headline font-black text-2xl text-slate-900">John Doe, You are Fully Verified!</h3>
+                  <h3 className="font-headline font-black text-2xl text-slate-900">You are Fully Verified!</h3>
                   <p className="text-sm text-slate-500 font-medium leading-relaxed">
-                    Your sovereign credentials and physical landmark reviews have been approved. All limits concerning interest-free loans and zero-fee cooperative distributions have been expanded.
+                    Your identity documents and address details have been approved. You now have full access to cooperative loans and member benefits.
                   </p>
                 </div>
 
@@ -465,16 +465,16 @@ export default function KYCOnboarding() {
                   <div className="flex justify-between items-start">
                     <div className="space-y-3 font-mono">
                       <div>
-                        <p className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider">Verified Account Tier</p>
-                        <p className="text-sm font-black text-white">LEVEL III PREMIUM MEMBER</p>
+                        <p className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider">Account Tier</p>
+                        <p className="text-sm font-black text-white">LEVEL III FULL MEMBER</p>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <p className="text-[8px] text-emerald-400">CREDIT LIMIT</p>
+                          <p className="text-[8px] text-emerald-400">LOAN LIMIT</p>
                           <p className="text-xs font-bold">₦10,000,000</p>
                         </div>
                         <div>
-                          <p className="text-[8px] text-emerald-400">SURPLUS PAYOUT</p>
+                          <p className="text-[8px] text-emerald-400">ANNUAL SURPLUS</p>
                           <p className="text-xs font-bold">UNRESTRICTED</p>
                         </div>
                       </div>
@@ -498,9 +498,9 @@ export default function KYCOnboarding() {
                 </div>
 
                 <div className="space-y-3 max-w-lg">
-                  <h3 className="font-headline font-black text-2xl text-slate-900">ID Verification Flagged</h3>
+                  <h3 className="font-headline font-black text-2xl text-slate-900">Verification Unsuccessful</h3>
                   <p className="text-sm text-slate-500 font-medium leading-relaxed">
-                    Our compliance registry flag detected biometric discrepancies. This typically happens if document pictures have glare or low brightness, or address documents are older than 3 months.
+                    We could not verify your documents. This usually happens if the photo is blurry, has glare, or if the proof of address is older than 3 months.
                   </p>
                 </div>
 
@@ -509,7 +509,7 @@ export default function KYCOnboarding() {
                   className="px-6 py-3.5 bg-emerald-900 hover:bg-emerald-800 text-white rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer shadow-md"
                 >
                   <RefreshCw size={14} />
-                  <span>Acknowledge & Resubmit Documents</span>
+                  <span>Resubmit Documents</span>
                 </button>
               </motion.div>
             )}
@@ -558,42 +558,42 @@ export default function KYCOnboarding() {
                       className="space-y-6"
                     >
                       <div className="space-y-2">
-                        <h4 className="font-headline font-bold text-slate-950 text-lg">National Identification Verification</h4>
-                        <p className="text-slate-500 text-xs font-medium">Please provide a valid, government-issued document card containing biometric hashes.</p>
+                        <h4 className="font-headline font-bold text-slate-950 text-lg">National ID Verification</h4>
+                        <p className="text-slate-500 text-xs font-medium">Please provide a valid, government-issued photo ID card or passport.</p>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Selector type */}
                         <div className="space-y-2">
-                          <label className="text-xs font-bold text-slate-500 ml-1">Document Category</label>
+                          <label className="text-xs font-bold text-slate-500 ml-1">ID Type</label>
                           <select
                             value={kycData.idType}
                             onChange={(e) => setKycData(prev => ({ ...prev, idType: e.target.value }))}
                             className="w-full bg-slate-50 border border-slate-150 rounded-2xl py-4 px-6 outline-none font-bold text-sm text-slate-800 cursor-pointer focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500"
                           >
-                            <option value="national_id">National Identification Number Card (NIN)</option>
-                            <option value="passport">International Sovereign Passport</option>
-                            <option value="drivers_license">Federal Drivers License Card</option>
-                            <option value="voters_card">INEC Permanent Voters Card</option>
+                            <option value="national_id">National Identification Number (NIN)</option>
+                            <option value="passport">International Passport</option>
+                            <option value="drivers_license">Driver's License</option>
+                            <option value="voters_card">Voter's Card</option>
                           </select>
                         </div>
 
                         {/* ID input number */}
                         <div className="space-y-2">
-                          <label className="text-xs font-bold text-slate-500 ml-1">Document Reference Number</label>
+                          <label className="text-xs font-bold text-slate-500 ml-1">ID Number</label>
                           <input 
                             type="text"
-                            placeholder="e.g. 11-digit NIN or Passport Reference"
+                            placeholder="e.g. 11-digit NIN or Passport Number"
                             value={kycData.idNumber}
                             onChange={(e) => setKycData(prev => ({ ...prev, idNumber: e.target.value }))}
-                            className="w-full bg-slate-50 border border-slate-150 rounded-2xl py-4 px-6 text-sm font-bold text-slate-850 outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500"
+                            className="w-full bg-slate-50 border border-slate-150 rounded-2xl py-4 px-6 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500"
                           />
                         </div>
                       </div>
 
                       {/* Drag & Drop File scan */}
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 ml-1">Electronic Document Front Scan</label>
+                        <label className="text-xs font-bold text-slate-500 ml-1">Upload ID Document (Front)</label>
                         <div 
                           onDragOver={(e) => handleDragOver(e, setIsDraggingID)}
                           onDragLeave={() => handleDragLeave(setIsDraggingID)}
@@ -623,7 +623,7 @@ export default function KYCOnboarding() {
                               </div>
                               <div>
                                 <p className="text-xs font-black text-slate-800">{kycData.idFileName}</p>
-                                <p className="text-[10px] text-slate-400 font-semibold font-mono">Simulated cryptographic receipt logged</p>
+                                <p className="text-[10px] text-slate-400 font-semibold font-mono">Uploaded successfully</p>
                               </div>
                               <button 
                                 onClick={() => setKycData(prev => ({ ...prev, idFileName: '', idFileUrl: null }))}
@@ -639,7 +639,7 @@ export default function KYCOnboarding() {
                               </div>
                               <div className="space-y-1">
                                 <p className="text-xs font-bold text-slate-800">
-                                  Drag and drop document scanning or <span className="text-emerald-800 hover:underline">browse files</span>
+                                  Drag and drop your file here or <span className="text-emerald-800 hover:underline">browse files</span>
                                 </p>
                                 <p className="text-[10px] text-slate-400 font-semibold">Supports JPEG, PNG, or PDF formats up to 10MB limit</p>
                               </div>
@@ -659,8 +659,8 @@ export default function KYCOnboarding() {
                       className="space-y-6"
                     >
                       <div className="space-y-2">
-                        <h4 className="font-headline font-bold text-slate-950 text-lg">Biometric Liveness Selfie Scan</h4>
-                        <p className="text-slate-500 text-xs font-medium">To mitigate document spoofing or member profile duplicates, provide a real-time face landmark match.</p>
+                        <h4 className="font-headline font-bold text-slate-950 text-lg">Photo Verification (Selfie)</h4>
+                        <p className="text-slate-500 text-xs font-medium">Please provide a clear photo of your face to confirm your identity matches your ID document.</p>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
@@ -678,7 +678,7 @@ export default function KYCOnboarding() {
                               {/* Horizontal scanning light element */}
                               <div className="absolute top-0 inset-x-0 h-1 bg-emerald-400 shadow-[0_0_15px_#10b981] animate-[bounce_2s_infinite]"></div>
                               <RefreshCw size={28} className="text-emerald-400 animate-spin" />
-                              <p className="text-xs font-mono font-bold tracking-widest text-emerald-400">ANALYZING BIOMETRIC CONTOURS...</p>
+                              <p className="text-xs font-mono font-bold tracking-widest text-emerald-400">CHECKING PHOTO...</p>
                             </div>
                           ) : kycData.selfieFileName ? (
                             <div className="space-y-3 relative z-10 flex flex-col items-center justify-center">
@@ -686,21 +686,21 @@ export default function KYCOnboarding() {
                                 <Check size={20} />
                               </div>
                               <div>
-                                <p className="text-xs font-bold font-mono">FACE_LIVENESS_PASS.MTRX</p>
-                                <p className="text-[9px] text-slate-400 font-mono">Hashed Biometrics: 0x9B1B...F782</p>
+                                <p className="text-xs font-bold font-mono">PHOTO_VERIFIED.JPG</p>
+                                <p className="text-[9px] text-slate-400 font-mono">Photo matched successfully</p>
                               </div>
                               <button 
                                 onClick={() => setKycData(prev => ({ ...prev, selfieFileName: '', selfieFileUrl: null }))}
                                 className="px-3 py-1 bg-white/10 hover:bg-white/20 text-white rounded-lg text-[9px] font-mono mt-1"
                               >
-                                Clear Hash
+                                Retake Photo
                               </button>
                             </div>
                           ) : (
                             <div className="space-y-3 relative z-10">
                               <Camera size={32} className="text-slate-400 mx-auto" strokeWidth={1.5} />
-                              <p className="text-xs font-bold text-slate-300">Biometric Camera Stream</p>
-                              <p className="text-[10px] text-slate-500 max-w-xs leading-normal">Requires physical permission check. No media is stored on unencrypted external cloud networks.</p>
+                              <p className="text-xs font-bold text-slate-300">Camera Preview</p>
+                              <p className="text-[10px] text-slate-500 max-w-xs leading-normal">Requires camera permission. Your photos are securely stored.</p>
                             </div>
                           )}
 
@@ -708,8 +708,8 @@ export default function KYCOnboarding() {
 
                         {/* Camera Action triggers */}
                         <div className="space-y-5">
-                          <p className="text-xs font-medium leading-relaxed text-slate-550 text-slate-600">
-                            Align your face in high illumination environments. Avoid caps, eyeglasses, or high-contrast shadows. Press the simulator trigger below to run the face scanning sweep.
+                          <p className="text-xs font-medium leading-relaxed text-slate-600">
+                            Make sure you are in a well-lit room. Avoid wearing hats or sunglasses. Click the button below to take a quick photo.
                           </p>
 
                           <div className="space-y-4">
@@ -719,11 +719,11 @@ export default function KYCOnboarding() {
                               className="w-full py-4 bg-emerald-900 text-white hover:bg-emerald-800 disabled:bg-slate-100 disabled:text-slate-400 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
                             >
                               <Camera size={16} />
-                              <span>Authorize Live Biometric Scan</span>
+                              <span>Take Live Photo</span>
                             </button>
 
                             <div className="text-center">
-                              <span className="text-[10px] text-slate-400 font-mono">OR DIRECT MANUAL FILE SUBMIT</span>
+                              <span className="text-[10px] text-slate-400 font-mono">OR UPLOAD FROM DEVICE</span>
                             </div>
 
                             <input
@@ -743,7 +743,7 @@ export default function KYCOnboarding() {
                               className="w-full py-3.5 border border-slate-200 hover:bg-slate-50 text-slate-500 rounded-xl text-xs font-bold text-center transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[44px]"
                             >
                               <Upload size={14} />
-                              <span>Manual Passport File Upload</span>
+                              <span>Upload Photo from Device</span>
                             </label>
                           </div>
                         </div>
@@ -761,17 +761,17 @@ export default function KYCOnboarding() {
                       className="space-y-6"
                     >
                       <div className="space-y-2">
-                        <h4 className="font-headline font-bold text-slate-950 text-lg">Residency & Proof of Address Verification</h4>
-                        <p className="text-slate-500 text-xs font-medium">Under Nigerian anti-laundering guidelines, we must confirm physical geographic residency traces.</p>
+                        <h4 className="font-headline font-bold text-slate-950 text-lg">Residential Address & Proof of Address</h4>
+                        <p className="text-slate-500 text-xs font-medium">Please enter your current residential address and upload a recent proof of address.</p>
                       </div>
 
                       <div className="space-y-4 bg-slate-50 p-6 rounded-3xl border border-slate-150">
-                        <h5 className="font-headline font-bold text-xs text-slate-800 uppercase tracking-widest">Sovereign Physical Coordinates</h5>
+                        <h5 className="font-headline font-bold text-xs text-slate-800 uppercase tracking-widest">Home Address</h5>
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <input 
                             type="text"
-                            placeholder="Street Address Line"
+                            placeholder="Street Address"
                             value={kycData.addressLine}
                             onChange={(e) => setKycData(prev => ({ ...prev, addressLine: e.target.value }))}
                             className="w-full bg-white border border-slate-150 rounded-xl py-3 px-4 text-xs font-bold text-slate-800 outline-none"
@@ -785,14 +785,14 @@ export default function KYCOnboarding() {
                           />
                           <input 
                             type="text"
-                            placeholder="State Region"
+                            placeholder="State"
                             value={kycData.state}
                             onChange={(e) => setKycData(prev => ({ ...prev, state: e.target.value }))}
                             className="w-full bg-white border border-slate-150 rounded-xl py-3 px-4 text-xs font-bold text-slate-800 outline-none"
                           />
                           <input 
                             type="text"
-                            placeholder="Postal / ZIP Code"
+                            placeholder="Postal / ZIP Code (Optional)"
                             value={kycData.postalCode}
                             onChange={(e) => setKycData(prev => ({ ...prev, postalCode: e.target.value }))}
                             className="w-full bg-white border border-slate-150 rounded-xl py-3 px-4 text-xs font-bold text-slate-800 outline-none"
@@ -803,22 +803,22 @@ export default function KYCOnboarding() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Doc proof selector */}
                         <div className="space-y-2">
-                          <label className="text-xs font-bold text-slate-500 ml-1">Proof Category</label>
+                          <label className="text-xs font-bold text-slate-500 ml-1">Document Type</label>
                           <select
                             value={kycData.proofType}
                             onChange={(e) => setKycData(prev => ({ ...prev, proofType: e.target.value }))}
                             className="w-full bg-slate-50 border border-slate-150 rounded-2xl py-4 px-6 outline-none font-bold text-sm text-slate-800 cursor-pointer"
                           >
                             <option value="utility">Electricity / Water / Waste Utility Bill</option>
-                            <option value="bank_statement">Certified Bank Statement Document</option>
-                            <option value="tax_clearance">Municipal Tax Clearance Ledger</option>
-                            <option value="lease_agreement">Verified Tenancy Lease Agreement</option>
+                            <option value="bank_statement">Bank Statement (Last 3 Months)</option>
+                            <option value="tax_clearance">Tax Clearance Certificate</option>
+                            <option value="lease_agreement">Tenancy / Lease Agreement</option>
                           </select>
                         </div>
 
                         {/* Drag Proof Upload */}
                         <div className="space-y-2">
-                          <label className="text-xs font-bold text-slate-500 ml-1">Proof Document Attachment File</label>
+                          <label className="text-xs font-bold text-slate-500 ml-1">Upload Document</label>
                           <div
                             onDragOver={(e) => handleDragOver(e, setIsDraggingProof)}
                             onDragLeave={() => handleDragLeave(setIsDraggingProof)}
@@ -843,7 +843,7 @@ export default function KYCOnboarding() {
                             
                             {kycData.proofFileName ? (
                               <div className="flex justify-between items-center text-xs font-mono font-bold">
-                                <span className="text-emerald-805 text-emerald-800 line-clamp-1 truncate block max-w-[180px]">{kycData.proofFileName}</span>
+                                <span className="text-emerald-800 line-clamp-1 truncate block max-w-[180px]">{kycData.proofFileName}</span>
                                 <button 
                                   onClick={() => setKycData(prev => ({ ...prev, proofFileName: '', proofFileUrl: null }))}
                                   className="p-1 rounded bg-slate-100 text-slate-500 hover:text-rose-600"
@@ -852,9 +852,9 @@ export default function KYCOnboarding() {
                                 </button>
                               </div>
                             ) : (
-                              <label htmlFor="proofUploadInput" className="cursor-pointer text-xs font-bold text-slate-500 hover:text-emerald-850 flex items-center justify-center gap-1.5 min-h-[44px]">
+                              <label htmlFor="proofUploadInput" className="cursor-pointer text-xs font-bold text-slate-500 hover:text-emerald-800 flex items-center justify-center gap-1.5 min-h-[44px]">
                                 <Upload size={14} />
-                                <span>Add Proof of Address Scan</span>
+                                <span>Upload Proof of Address</span>
                               </label>
                             )}
                           </div>
@@ -873,8 +873,8 @@ export default function KYCOnboarding() {
                       className="space-y-6 text-slate-600 font-body text-xs leading-relaxed"
                     >
                       <div className="space-y-2">
-                        <h4 className="font-headline font-bold text-slate-950 text-lg">Sovereign Signature & Security Attestation</h4>
-                        <p className="text-slate-500 text-xs font-medium">Commit credentials under full legal responsibility and regulatory compliance guidelines.</p>
+                        <h4 className="font-headline font-bold text-slate-950 text-lg">Review & Confirmation</h4>
+                        <p className="text-slate-500 text-xs font-medium">Please review your information before submitting for verification.</p>
                       </div>
 
                       {/* Display Data Summary */}
@@ -884,32 +884,32 @@ export default function KYCOnboarding() {
                           <p className="text-slate-800 font-bold mt-1 uppercase text-xs">
                             {kycData.idType.replace('_', ' ')}
                           </p>
-                          <p className="text-slate-550 text-slate-500 leading-normal truncate">{kycData.idNumber || 'No ID Ref Entered'}</p>
-                          {kycData.idFileName && <span className="text-emerald-705 text-emerald-700 block mt-1">✔ scan attachment load</span>}
+                          <p className="text-slate-500 leading-normal truncate">{kycData.idNumber || 'No ID Number Entered'}</p>
+                          {kycData.idFileName && <span className="text-emerald-700 block mt-1">✔ Document uploaded</span>}
                         </div>
                         <div>
-                          <p className="font-bold text-slate-400">BIOMETRICS CHECK</p>
-                          <p className="text-slate-800 font-bold mt-1 text-xs">SELFIE FRAME MATRIX</p>
+                          <p className="font-bold text-slate-400">PHOTO CHECK</p>
+                          <p className="text-slate-800 font-bold mt-1 text-xs">SELFIE PHOTO</p>
                           {kycData.selfieFileName ? (
-                            <span className="text-emerald-705 text-emerald-700 block mt-1 font-extrabold">✔ CAMERA CAPTURED SECURE</span>
+                            <span className="text-emerald-700 block mt-1 font-extrabold">✔ PHOTO ATTACHED</span>
                           ) : (
-                            <span className="text-rose-650 text-rose-650/80 block mt-1 font-extrabold uppercase">🚫 Face Capture Missing</span>
+                            <span className="text-rose-600/80 block mt-1 font-extrabold uppercase">🚫 Photo Missing</span>
                           )}
                         </div>
                         <div>
-                          <p className="font-bold text-slate-400">PHYSICAL ADDRESS TRACE</p>
+                          <p className="font-bold text-slate-400">HOME ADDRESS</p>
                           <p className="text-slate-800 font-bold mt-1 text-xs truncate max-w-[150px]">
-                            {kycData.addressLine || 'Blank Address'}
+                            {kycData.addressLine || 'No Address'}
                           </p>
-                          <p className="text-slate-550 text-slate-500 leading-normal">{kycData.city}, {kycData.state}</p>
-                          {kycData.proofFileName && <span className="text-emerald-705 text-emerald-700 block mt-1">✔ residency proof file load</span>}
+                          <p className="text-slate-500 leading-normal">{kycData.city}, {kycData.state}</p>
+                          {kycData.proofFileName && <span className="text-emerald-700 block mt-1">✔ Proof uploaded</span>}
                         </div>
                       </div>
 
                       <div className="p-5 rounded-2xl bg-amber-50/50 border border-amber-500/10 space-y-3">
-                        <p className="font-extrabold text-amber-950 text-xs">Strict Zero-Interest Cooperative Declaration</p>
-                        <p className="text-[10px] text-slate-650 text-slate-600">
-                          By clicking "Audit My Sovereign Credentials" below, you attest that the passport details and biometric landmarks provided represent your distinct personal identity. Any attempt to upload fraudulent documentation, forged utility bills, or third-party bank statements is flagged by our state cooperative forensic network and reported directly code compliance desks.
+                        <p className="font-extrabold text-amber-950 text-xs">Member Declaration & Agreement</p>
+                        <p className="text-[10px] text-slate-600">
+                          By submitting this form, you confirm that all personal details, documents, and photos provided are accurate, authentic, and belong to you.
                         </p>
                       </div>
 
@@ -920,7 +920,7 @@ export default function KYCOnboarding() {
                           className="h-4.5 w-4.5 rounded border-slate-300 text-emerald-800 focus:ring-emerald-500 accent-emerald-800 mt-0.5 cursor-pointer"
                         />
                         <label htmlFor="auditConfirm" className="text-[10px] text-slate-500 font-semibold cursor-pointer select-none leading-normal">
-                          I explicitly authorize ZIMCO compliance audit teams to cross-reference my identification vectors across government identification engines, in full compliance with the sovereign Nigerian Data Protection Regulation frameworks.
+                          I confirm that the information provided is correct and authorize ZIMCO to verify my details in accordance with Nigerian Data Protection Regulations.
                         </label>
                       </div>
 
@@ -948,7 +948,7 @@ export default function KYCOnboarding() {
                       onClick={handleNext}
                       className="px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer"
                     >
-                      <span>Continue & Advance</span>
+                      <span>Continue</span>
                       <ArrowRight size={14} />
                     </button>
                   ) : (
@@ -957,7 +957,7 @@ export default function KYCOnboarding() {
                       className="px-6 py-3 bg-emerald-900 hover:bg-emerald-800 text-white rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer shadow-md"
                     >
                       <ShieldCheck size={16} />
-                      <span>Audit My Sovereign Credentials</span>
+                      <span>Submit for Verification</span>
                     </button>
                   )}
 

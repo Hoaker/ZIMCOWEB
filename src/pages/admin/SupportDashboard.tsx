@@ -227,20 +227,20 @@ export default function SupportDashboard() {
         {/* Helpdesk Title Banner */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-widest mb-1 animate-pulse">
-              <LifeBuoy size={14} />
+            <div className="flex items-center gap-2 text-primary font-bold text-[10px] sm:text-xs uppercase tracking-widest mb-1 animate-pulse">
+              <LifeBuoy className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
               Zimco Operations Escalation Center
             </div>
-            <h1 className="text-3xl font-black text-on-surface tracking-tight font-headline">Escalated Ticket Helpdesk</h1>
-            <p className="text-sm text-on-surface-variant mt-1">Manage, dispatch, audit, and resolve member loan ledger discrepancies or payout clearing bottlenecks.</p>
+            <h1 className="text-2xl sm:text-3xl font-black text-on-surface tracking-tight font-headline">Escalated Ticket Helpdesk</h1>
+            <p className="text-xs sm:text-sm text-on-surface-variant mt-1">Manage, dispatch, audit, and resolve member loan ledger discrepancies or payout clearing bottlenecks.</p>
           </div>
           
           <div className="flex items-center gap-3">
             <button 
               onClick={handleSyncTicket}
-              className="px-5 py-2.5 bg-white border border-surface-container-high rounded-xl text-xs font-bold uppercase tracking-widest text-on-surface-variant hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm"
+              className="px-3.5 py-2 sm:px-5 sm:py-2.5 bg-white border border-surface-container-high rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-widest text-on-surface-variant hover:bg-slate-50 transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm"
             >
-              <History size={18} />
+              <History className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 shrink-0" />
               Sync Ledger Queue
             </button>
           </div>
@@ -248,40 +248,40 @@ export default function SupportDashboard() {
 
         {/* System Messages Banner */}
         {sysAlert && (
-          <div className="p-4 bg-emerald-50 text-emerald-950 border border-emerald-250 rounded-2xl text-xs font-semibold flex items-center gap-2 shadow-sm">
-            <CheckCircle2 size={16} className="text-emerald-700" />
+          <div className="p-3.5 sm:p-4 bg-emerald-50 text-emerald-950 border border-emerald-250 rounded-2xl text-xs font-semibold flex items-center gap-2 shadow-sm">
+            <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-700 shrink-0" />
             <span>{sysAlert.text}</span>
           </div>
         )}
 
         {/* Metric Aggregates Row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <div className="bg-white rounded-3xl p-6 border border-slate-100 flex items-center justify-between">
+          <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-100 flex items-center justify-between">
             <div className="space-y-1">
               <span className="text-[10px] text-slate-400 font-black tracking-widest uppercase">Open Tickets</span>
-              <p className="text-3xl font-black text-slate-900">{totalOpen}</p>
+              <p className="text-2xl sm:text-3xl font-black text-slate-900">{totalOpen}</p>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-700 font-bold">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-700 font-bold text-sm sm:text-base shrink-0">
               {totalOpen}
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl p-6 border border-slate-100 flex items-center justify-between">
+          <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-100 flex items-center justify-between">
             <div className="space-y-1">
               <span className="text-[10px] text-slate-400 font-black tracking-widest uppercase">High/Crit Gravity</span>
-              <p className="text-3xl font-black text-rose-600">{criticalCount}</p>
+              <p className="text-2xl sm:text-3xl font-black text-rose-600">{criticalCount}</p>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-600 font-bold">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-600 font-bold text-sm sm:text-base shrink-0">
               {criticalCount}
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl p-6 border border-slate-100 flex items-center justify-between">
+          <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-100 flex items-center justify-between">
             <div className="space-y-1">
               <span className="text-[10px] text-slate-400 font-black tracking-widest uppercase">Unresolved Dispatch</span>
-              <p className="text-3xl font-black text-indigo-600">{unassignedCount}</p>
+              <p className="text-2xl sm:text-3xl font-black text-indigo-600">{unassignedCount}</p>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-sm sm:text-base shrink-0">
               {unassignedCount}
             </div>
           </div>
@@ -294,20 +294,20 @@ export default function SupportDashboard() {
           <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
             
             {/* Filter controls */}
-            <div className="p-6 md:p-8 bg-slate-50/50 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="p-5 sm:p-6 md:p-8 bg-slate-50/50 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <h3 className="font-bold text-slate-900 text-lg">Support Queue Queue</h3>
+                <h3 className="font-bold text-slate-900 text-base sm:text-lg">Support Queue</h3>
                 <p className="text-xs text-slate-400 mt-0.5">Filter concerns through categorization parameters.</p>
               </div>
 
               {/* Filtering matrix widgets */}
               <div className="flex flex-wrap items-center gap-2">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                   <input 
                     type="text" 
                     placeholder="Search query/ID..." 
-                    className="pl-8 pr-4 py-2 bg-white border border-slate-205 rounded-xl text-xs outline-none focus:ring-1 focus:ring-emerald-500 w-36 md:w-44"
+                    className="pl-8 pr-4 py-1.5 sm:py-2 bg-white border border-slate-205 rounded-xl text-xs outline-none focus:ring-1 focus:ring-emerald-500 w-36 md:w-44"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
@@ -316,7 +316,7 @@ export default function SupportDashboard() {
                 <select
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="px-3 py-2 bg-white border border-slate-205 rounded-xl text-xs outline-none font-bold text-slate-700"
+                  className="px-2.5 sm:px-3 py-1.5 sm:py-2 bg-white border border-slate-205 rounded-xl text-xs outline-none font-bold text-slate-700"
                 >
                   <option value="all">All Specs</option>
                   <option value="loan_adjustment">Loan Balance</option>
@@ -327,7 +327,7 @@ export default function SupportDashboard() {
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 bg-white border border-slate-205 rounded-xl text-xs outline-none font-bold text-slate-700"
+                  className="px-2.5 sm:px-3 py-1.5 sm:py-2 bg-white border border-slate-205 rounded-xl text-xs outline-none font-bold text-slate-700"
                 >
                   <option value="all">All States</option>
                   <option value="pending">Pending</option>
@@ -342,32 +342,32 @@ export default function SupportDashboard() {
             <div className="divide-y divide-slate-100 overflow-y-auto max-h-[500px]">
               {filteredTickets.length === 0 ? (
                 <div className="text-center py-16 text-slate-400 flex flex-col items-center justify-center p-6 gap-2">
-                  <AlertCircle size={32} className="text-slate-300" />
-                  <p className="text-sm font-semibold">No tickets mapped matching parameters.</p>
+                  <AlertCircle className="w-7 h-7 sm:w-8 sm:h-8 text-slate-300 shrink-0" />
+                  <p className="text-xs sm:text-sm font-semibold">No tickets mapped matching parameters.</p>
                 </div>
               ) : (
                 filteredTickets.map(t => (
                   <div 
                     key={t.id} 
                     onClick={() => setSelectedTicket(t)}
-                    className={`p-6 transition-colors hover:bg-slate-50 cursor-pointer flex items-start gap-4 ${
+                    className={`p-4 sm:p-6 transition-colors hover:bg-slate-50 cursor-pointer flex items-start gap-3 sm:gap-4 ${
                       selectedTicket?.id === t.id ? 'bg-emerald-50/10' : ''
                     }`}
                   >
                     <div className="space-y-2 grow">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-xs font-bold text-slate-405 text-slate-400">{t.id}</span>
                         {getUrgencyBadge(t.urgency)}
                         <span className="text-[10px] px-2 py-0.5 rounded-md text-emerald-950 font-bold bg-slate-105 border border-slate-201 text-slate-500 border-slate-200 uppercase tracking-tighter">
                           {t.category.replace('_', ' ')}
                         </span>
                       </div>
-                      <h4 className="font-black text-slate-900 tracking-tight text-sm uppercase">{t.subject}</h4>
+                      <h4 className="font-black text-slate-900 tracking-tight text-xs sm:text-sm uppercase">{t.subject}</h4>
                       
                       {/* Sub-line summary reporting data info */}
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] sm:text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
                         <span className="text-slate-700 font-extrabold flex items-center gap-1">
-                          <User size={10} /> {t.memberName}
+                          <User className="w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0" /> {t.memberName}
                         </span>
                         <span>Opened: {new Date(t.createdAt).toLocaleDateString()}</span>
                         {t.assignee ? (
@@ -414,7 +414,7 @@ export default function SupportDashboard() {
                   {/* General Complaint Details Metadata */}
                   <div className="pb-4 border-b border-slate-100 space-y-3">
                     <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-widest block">COMPLAINT SOURCE DETAIL</span>
-                    <div className="p-4 bg-slate-50 rounded-2xl text-xs space-y-2 border border-slate-100 dark:border-slate-800">
+                    <div className="p-4 bg-slate-50 rounded-2xl text-xs space-y-2 border border-slate-100">
                       <div className="flex justify-between font-bold text-slate-800">
                         <span>John Doe (ID: {selectedTicket.memberId})</span>
                         <span className="text-rose-605 text-rose-600 font-mono">₦{(selectedTicket.amountAffected || 0).toLocaleString()}</span>

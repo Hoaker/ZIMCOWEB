@@ -3,16 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ZIMCO | Secure Access</title>
+    <title>ZIMCO Co-operative Society</title>
+    <meta name="description" content="Nigeria's leading zero-interest co-operative society empowering financial futures through ethical growth, Muslim Community Account (MCA) management, and comprehensive treasury audit reporting." />
+    <meta property="og:title" content="ZIMCO Co-operative Society" />
+    <meta property="og:description" content="Nigeria's leading zero-interest co-operative society empowering financial futures through ethical growth, Muslim Community Account (MCA) management, and comprehensive treasury audit reporting." />
     <script>
       (function() {
-        const persisted = localStorage.getItem('theme');
-        const isDark = persisted ? persisted === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (isDark) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
+        document.documentElement.classList.remove('dark');
+        try {
+          localStorage.removeItem('theme');
+        } catch (e) {}
       })();
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>

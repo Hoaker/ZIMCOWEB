@@ -10,6 +10,8 @@ import Register from './pages/Register';
 import Placeholder from './pages/Placeholder';
 import Portal from './pages/Portal';
 import Login from './pages/Login';
+import MemberLogin from './pages/MemberLogin';
+import StaffLogin from './pages/StaffLogin';
 import MemberDashboard from './pages/MemberDashboard';
 import BursaryDashboard from './pages/admin/BursaryDashboard';
 import EditDeductions from './pages/admin/EditDeductions';
@@ -22,6 +24,7 @@ import SupportDashboard from './pages/admin/SupportDashboard';
 import Compliance from './pages/Compliance';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
+import DownloadSamples from './pages/DownloadSamples';
 import TermsConsentBanner from './components/TermsConsentBanner';
 
 function ScrollToTop() {
@@ -37,9 +40,13 @@ export default function App() {
     <Router>
       <ScrollToTop />
       <Routes>
-        {/* Portal has its own layout */}
+        {/* Portal & Login Routes */}
         <Route path="/portal" element={<Portal />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/login/member" element={<MemberLogin />} />
+        <Route path="/member-login" element={<MemberLogin />} />
+        <Route path="/login/staff" element={<StaffLogin />} />
+        <Route path="/staff-login" element={<StaffLogin />} />
         
         {/* Member Dashboard */}
         <Route path="/dashboard" element={<MemberDashboard />} />
@@ -55,6 +62,10 @@ export default function App() {
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin" element={<AdminDashboard />} />
         
+        {/* Download Samples Suite */}
+        <Route path="/download-samples" element={<DownloadSamples />} />
+        <Route path="/test-files" element={<DownloadSamples />} />
+
         {/* Main Layout */}
         <Route
           path="*"
@@ -88,9 +99,9 @@ export default function App() {
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
                   <span className="text-[10px] uppercase font-bold tracking-widest">Services</span>
                 </Link>
-                <Link className="flex flex-col items-center gap-1 text-slate-400" to="/portal">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                  <span className="text-[10px] uppercase font-bold tracking-widest">Portal</span>
+                <Link className="flex flex-col items-center gap-1 text-slate-400" to="/login/member">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                  <span className="text-[10px] uppercase font-bold tracking-widest">Login</span>
                 </Link>
               </div>
             </div>

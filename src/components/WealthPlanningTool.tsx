@@ -206,7 +206,7 @@ export default function WealthPlanningTool() {
             }`}
           >
             <TrendingUp size={16} />
-            <span>Ethical Profit Optimizer</span>
+            <span>Returns Calculator</span>
           </button>
 
           <button
@@ -218,7 +218,7 @@ export default function WealthPlanningTool() {
             }`}
           >
             <Sliders size={16} />
-            <span>Commodity Murabaha Estimator</span>
+            <span>Asset Financing Calculator</span>
           </button>
 
           <button
@@ -230,12 +230,12 @@ export default function WealthPlanningTool() {
             }`}
           >
             <FileText size={16} />
-            <span>Official Statement Exporter</span>
+            <span>Account Statement</span>
           </button>
         </div>
 
         <div className="text-xs text-slate-400 font-bold font-mono tracking-wider bg-slate-100 px-3 py-1 rounded-full uppercase">
-          Planning Module V4.0 Active
+          Planning Tools
         </div>
       </div>
 
@@ -257,13 +257,13 @@ export default function WealthPlanningTool() {
               
               <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-slate-100 space-y-6">
                 <div>
-                  <h3 className="font-headline text-xl font-bold text-slate-900">Configure Projection</h3>
-                  <p className="text-xs text-slate-400 mt-1">Calibrate anticipated yield matrices using physical assets asset-backing.</p>
+                  <h3 className="font-headline text-xl font-bold text-slate-900">Estimate Your Returns</h3>
+                  <p className="text-xs text-slate-400 mt-1">Calculate your expected profit share based on your investment amount and duration.</p>
                 </div>
 
                 {/* Capital Presets Selection Dropdown */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 ml-1">Asset Allocation Pool</label>
+                  <label className="text-xs font-bold text-slate-500 ml-1">Investment Pool</label>
                   <select
                     value={selectedPresetId}
                     onChange={(e) => setSelectedPresetId(e.target.value)}
@@ -271,7 +271,7 @@ export default function WealthPlanningTool() {
                   >
                     {PORTFOLIO_PRESETS.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.name} ({p.historicRatio}% Ratio)
+                        {p.name} ({p.historicRatio}% Est. Return)
                       </option>
                     ))}
                   </select>
@@ -280,7 +280,7 @@ export default function WealthPlanningTool() {
                 {/* Capital Deposit Slider & Input */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center ml-1">
-                    <label className="text-xs font-bold text-slate-500">Capital Commited</label>
+                    <label className="text-xs font-bold text-slate-500">Deposit Amount</label>
                     <span className="text-xs font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
                       ₦{depositAmount.toLocaleString()}
                     </span>
@@ -304,7 +304,7 @@ export default function WealthPlanningTool() {
                 {/* Duration Slider */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center ml-1">
-                    <label className="text-xs font-bold text-slate-500">Projection Period</label>
+                    <label className="text-xs font-bold text-slate-500">Investment Duration</label>
                     <span className="text-xs font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
                       {projectionPeriod} {projectionPeriod === 1 ? 'Year' : 'Years'}
                     </span>
@@ -338,11 +338,11 @@ export default function WealthPlanningTool() {
                   />
                   <div className="space-y-1">
                     <label htmlFor="reinvest" className="text-xs font-bold text-slate-800 cursor-pointer flex items-center gap-1">
-                      <span>Ethical Profit Reinvestment</span>
+                      <span>Reinvest Annual Returns</span>
                       <Sparkles size={13} className="text-emerald-700 animate-pulse" />
                     </label>
                     <p className="text-[10px] text-slate-500 leading-normal">
-                      Automatically compounding monthly dividends into the active cooperative business pool. Exponential capital depth without usurious compound lending structures.
+                      Automatically add your yearly profit share back to your balance to grow your returns over time.
                     </p>
                   </div>
                 </div>
@@ -358,7 +358,7 @@ export default function WealthPlanningTool() {
                   className="w-full py-3 border border-slate-200 hover:bg-slate-50 text-slate-500 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <RotateCcw size={14} />
-                  <span>Reset Variables</span>
+                  <span>Reset Values</span>
                 </button>
 
               </div>
@@ -367,7 +367,7 @@ export default function WealthPlanningTool() {
               <div className="bg-emerald-950 text-white p-8 rounded-[2.5rem] border border-emerald-800 shadow-xl space-y-4">
                 <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
                   <Award size={16} />
-                  <span>Pool Mandate Details</span>
+                  <span>Investment Pool Info</span>
                 </div>
                 <h4 className="font-headline font-bold text-white text-lg">{selectedPreset.name}</h4>
                 <p className="text-xs text-slate-300 leading-relaxed font-body">
@@ -375,11 +375,11 @@ export default function WealthPlanningTool() {
                 </p>
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t border-emerald-800/80 text-xs font-mono">
                   <div>
-                    <span className="text-emerald-400 block text-[10px]">HISTORIC RATIO:</span>
+                    <span className="text-emerald-400 block text-[10px]">ESTIMATED ANNUAL RETURN:</span>
                     <span className="font-black text-white text-lg">{selectedPreset.historicRatio}%</span>
                   </div>
                   <div>
-                    <span className="text-emerald-400 block text-[10px]">MIN LOCK TIME:</span>
+                    <span className="text-emerald-400 block text-[10px]">MINIMUM PERIOD:</span>
                     <span className="font-black text-white text-lg">{selectedPreset.minLockPeriod} Months</span>
                   </div>
                 </div>
@@ -395,28 +395,28 @@ export default function WealthPlanningTool() {
                 {/* Visual Projection Summary Metrics */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-6 rounded-[2rem] border border-slate-150">
                   <div className="space-y-1">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block font-mono">Principal Invested</span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block font-mono">Initial Deposit</span>
                     <p className="text-xl font-black text-slate-800">₦{depositAmount.toLocaleString()}</p>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block font-mono">Projected Profit Share</span>
-                    <p className="text-xl font-black text-emerald-850 text-emerald-800">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block font-mono">Estimated Total Profit</span>
+                    <p className="text-xl font-black text-emerald-800">
                       +₦{Math.round(reinvestmentOption ? (finalBalance - depositAmount) : totalProfit).toLocaleString()}
                     </p>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block font-mono">Projected Total Valuation</span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block font-mono">Estimated Final Balance</span>
                     <p className="text-xl font-black text-slate-900 font-headline">
                       ₦{Math.round(reinvestmentOption ? finalBalance : (depositAmount + totalProfit)).toLocaleString()}
                     </p>
                   </div>
                 </div>
 
-                {/* Graphical Visualizer (Beautiful Custom SVG Bar graph with labels) */}
+                {/* Graphical Visualizer */}
                 <div className="space-y-4">
                   <div className="flex justify-between items-center ml-1">
-                    <h4 className="font-headline font-bold text-slate-800 text-sm">Incremental Capital Evaluation Plot</h4>
-                    <span className="text-[10px] text-slate-400 font-mono">Compound Method: {reinvestmentOption ? 'Locked Ethic' : 'Direct Cash out'}</span>
+                    <h4 className="font-headline font-bold text-slate-800 text-sm">Growth Over Time</h4>
+                    <span className="text-[10px] text-slate-400 font-mono">Method: {reinvestmentOption ? 'Reinvested' : 'Annual Payout'}</span>
                   </div>
 
                   <div className="relative h-64 bg-slate-50/50 border border-slate-150 rounded-2xl flex items-end justify-around p-6 pt-12">
@@ -424,8 +424,8 @@ export default function WealthPlanningTool() {
                     {/* Y-axis ticks */}
                     <div className="absolute left-4 top-4 bottom-6 flex flex-col justify-between text-[9px] text-slate-400 font-mono font-bold pointer-events-none">
                       <span>Max Target</span>
-                      <span>50% Depth</span>
-                      <span>Principal</span>
+                      <span>Midpoint</span>
+                      <span>Initial</span>
                     </div>
 
                     {/* Bars Grid */}
@@ -440,7 +440,7 @@ export default function WealthPlanningTool() {
                           
                           {/* Hover tooltip */}
                           <div className="pointer-events-none absolute -top-8 bg-slate-900 text-white text-[10px] px-2.5 py-1 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 font-mono">
-                            End Val: ₦{Math.round(row.endingBalance).toLocaleString()} <br />
+                            Balance: ₦{Math.round(row.endingBalance).toLocaleString()} <br />
                             Profit: ₦{Math.round(row.cumulativeProfit).toLocaleString()}
                           </div>
 
@@ -474,11 +474,11 @@ export default function WealthPlanningTool() {
                   <div className="flex justify-center gap-6 text-[10px] font-bold text-slate-500 font-mono pt-2">
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 bg-slate-300 rounded"></div>
-                      <span>Base Capital Principal</span>
+                      <span>Initial Deposit</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 bg-emerald-600 rounded"></div>
-                      <span>Projected Profit Shares (Surplus Allocation)</span>
+                      <span>Estimated Profit</span>
                     </div>
                   </div>
 
@@ -486,20 +486,20 @@ export default function WealthPlanningTool() {
 
                 {/* Audit breakdown table */}
                 <div className="space-y-4">
-                  <h4 className="font-headline font-bold text-slate-800 text-sm ml-1">Structured Amortized Pro-Rata Table</h4>
+                  <h4 className="font-headline font-bold text-slate-800 text-sm ml-1">Yearly Breakdown</h4>
                   <div className="overflow-hidden border border-slate-150 rounded-2xl">
                     <table className="w-full text-left text-xs font-semibold">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-150 text-slate-400 font-mono font-bold text-[10px] uppercase tracking-wider">
-                          <th className="py-3 px-5">Year Index</th>
-                          <th className="py-3 px-5 text-right">Annual Surplus Payout</th>
-                          <th className="py-3 px-5 text-right font-bold text-slate-800">Total Accumulation</th>
+                          <th className="py-3 px-5">Year</th>
+                          <th className="py-3 px-5 text-right">Estimated Annual Return</th>
+                          <th className="py-3 px-5 text-right font-bold text-slate-800">Total Balance</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-150 text-slate-600 font-mono">
                         {yearlyBreakdown.map((row) => (
                           <tr key={row.year} className="hover:bg-slate-50/40">
-                            <td className="py-3.5 px-5">Year {row.year} Payout Schedule</td>
+                            <td className="py-3.5 px-5">Year {row.year}</td>
                             <td className="py-3.5 px-5 text-right text-emerald-700 font-bold">+₦{Math.round(row.profitShare).toLocaleString()}</td>
                             <td className="py-3.5 px-5 text-right font-black text-slate-800">₦{Math.round(row.endingBalance).toLocaleString()}</td>
                           </tr>
@@ -510,12 +510,12 @@ export default function WealthPlanningTool() {
                 </div>
 
                 {/* Shari'ah Compliance / Anti-Usury Disclaimer Footnote */}
-                <div className="p-5 rounded-2xl bg-amber-50/50 border border-amber-250 border-amber-500/10 text-xs text-amber-900 leading-relaxed font-body flex gap-3">
+                <div className="p-5 rounded-2xl bg-amber-50/50 border border-amber-500/10 text-xs text-amber-900 leading-relaxed font-body flex gap-3">
                   <Scale className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-extrabold block mb-1">Zero-Usury Shari’ah Compliant Projection Parameters</span>
+                    <span className="font-extrabold block mb-1">Zero-Interest Cooperative Investment</span>
                     <p>
-                      Calculations utilize active performance indexes of underlying agricultural and logistics leases. Values are simulated for projection purposes. ZIMCO guarantees 100% absence of fixed borrowing rates, compounded debt penalties, and usurious variables. All capital assets have direct physical backing.
+                      Calculations are estimates based on historical pool performance. ZIMCO operates strictly under fair profit-sharing principles with zero interest, no hidden charges, and real asset backing.
                     </p>
                   </div>
                 </div>
@@ -541,13 +541,13 @@ export default function WealthPlanningTool() {
               
               <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-slate-100 space-y-6">
                 <div>
-                  <h3 className="font-headline text-xl font-bold text-slate-900">Leasing Calculator</h3>
-                  <p className="text-xs text-slate-400 mt-1">Acquire physical cooperative assets via interest-free installment Murabaha structures.</p>
+                  <h3 className="font-headline text-xl font-bold text-slate-900">Asset Financing Calculator</h3>
+                  <p className="text-xs text-slate-400 mt-1">Calculate your monthly installments for purchasing equipment or vehicles through the cooperative.</p>
                 </div>
 
                 {/* Capital Presets Buttons Grid */}
                 <div className="space-y-3">
-                  <label className="text-xs font-bold text-slate-500 ml-1">Pre-validated Equipment Packages</label>
+                  <label className="text-xs font-bold text-slate-500 ml-1">Sample Equipment Packages</label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {COMMODITY_PRESETS.map((preset, index) => (
                       <button
@@ -569,7 +569,7 @@ export default function WealthPlanningTool() {
 
                 {/* Asset Cost Input Field */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 ml-1">Custom Asset Acquisition Cost (₦)</label>
+                  <label className="text-xs font-bold text-slate-500 ml-1">Item / Equipment Cost (₦)</label>
                   <div className="relative">
                     <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">₦</span>
                     <input 
@@ -584,7 +584,7 @@ export default function WealthPlanningTool() {
 
                 {/* Month repayments Select Options */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 ml-1">Deferred Installment Cycle</label>
+                  <label className="text-xs font-bold text-slate-500 ml-1">Repayment Period</label>
                   <div className="grid grid-cols-4 gap-2.5">
                     {[3, 6, 12, 18, 24].map((mo) => (
                       <button
@@ -606,10 +606,10 @@ export default function WealthPlanningTool() {
                 <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-500/10 leading-relaxed space-y-2 text-xs">
                   <p className="font-bold text-emerald-950 flex items-center gap-1.5">
                     <CheckCircle size={14} className="text-emerald-700" />
-                    <span>Fixed Administrative Markups</span>
+                    <span>Transparent Fixed Pricing</span>
                   </p>
                   <p className="text-slate-500 text-[10px]">
-                    Under Murabaha rules, the cooperative acquires the asset and transfers ownership to the member at a fixed, transparent markup. This markup is agreed upon at sign-off and never shifts recursively across defaults. No usury, no compounding, no surprises.
+                    The cooperative purchases the item for you with a small, transparent fixed fee spread across your repayment period. No interest, no extra penalties for early repayment, and no surprise charges.
                   </p>
                 </div>
 
@@ -625,21 +625,21 @@ export default function WealthPlanningTool() {
                 {/* Visual Projection Summary Metrics */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6 bg-slate-50 p-6 rounded-[2rem] border border-slate-150">
                   <div className="space-y-1">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block font-mono">Physical Asset Cost</span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block font-mono">Item Price</span>
                     <p className="text-lg font-black text-slate-900">₦{assetCost.toLocaleString()}</p>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block font-mono">Cooperative Markup ({calculatedMarkupRate}%)</span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block font-mono">Cooperative Fee ({calculatedMarkupRate}%)</span>
                     <p className="text-lg font-black text-amber-800">₦{totalMarkupCost.toLocaleString()}</p>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block font-mono">Fixed Installment / Mo</span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block font-mono">Monthly Payment</span>
                     <p className="text-lg font-black text-emerald-850 text-emerald-800">
                       ₦{Math.round(monthlyInstallment).toLocaleString()}
                     </p>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block font-mono">Total Repayment Sum</span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block font-mono">Total Amount Payable</span>
                     <p className="text-lg font-black text-slate-800 font-headline">
                       ₦{Math.round(totalRepaymentAmount).toLocaleString()}
                     </p>
@@ -649,7 +649,7 @@ export default function WealthPlanningTool() {
                 {/* Installment Calendar Table */}
                 <div className="space-y-4">
                   <div className="flex justify-between items-center ml-1">
-                    <h4 className="font-headline font-bold text-slate-850 text-slate-800 text-sm">Amortized Murabaha Installment Schedule</h4>
+                    <h4 className="font-headline font-bold text-slate-850 text-slate-800 text-sm">Monthly Payment Schedule</h4>
                     <span className="text-[10px] text-slate-400 font-mono">Billing Cycle: Monthly Base</span>
                   </div>
 
@@ -657,10 +657,10 @@ export default function WealthPlanningTool() {
                     <table className="w-full text-left text-xs font-semibold">
                       <thead className="sticky top-0 bg-white z-10">
                         <tr className="bg-slate-50 border-b border-slate-150 text-slate-400 font-mono font-bold text-[10px] uppercase tracking-wider">
-                          <th className="py-3 px-5">Cycle #</th>
-                          <th className="py-3 px-5">Scheduled Due Date</th>
-                          <th className="py-3 px-5 text-right">Fixed Markup Portion</th>
-                          <th className="py-3 px-5 text-right text-slate-800 font-bold">Cycle installment Sum</th>
+                          <th className="py-3 px-5">Month</th>
+                          <th className="py-3 px-5">Due Date</th>
+                          <th className="py-3 px-5 text-right">Fee Portion</th>
+                          <th className="py-3 px-5 text-right text-slate-800 font-bold">Monthly Payment</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-150 text-slate-600 font-mono">
@@ -683,14 +683,14 @@ export default function WealthPlanningTool() {
                 {/* Joint Action alert buffer */}
                 <div className="p-6 bg-slate-900 text-white rounded-[2rem] flex flex-col sm:flex-row items-center justify-between gap-6">
                   <div className="space-y-1">
-                    <p className="font-bold text-sm">Ready to acquire this portfolio asset?</p>
-                    <p className="text-[10px] text-slate-400">Initiating a leasing contract requires 3 validated member guarantors.</p>
+                    <p className="font-bold text-sm">Ready to apply for asset financing?</p>
+                    <p className="text-[10px] text-slate-400">Financing requires member verification and active savings standing.</p>
                   </div>
                   <button 
-                    onClick={() => alert('Installment simulation complete. You must apply for a Commodity Account Murabaha Lease using the Loans page under "Apply New Credit".')}
+                    onClick={() => alert('Financing simulation complete. You can apply for financing under Loans in your dashboard.')}
                     className="px-6 py-3 bg-emerald-600 text-white hover:bg-emerald-500 rounded-xl text-xs font-black transition-colors shrink-0 cursor-pointer"
                   >
-                    Apply Lease Financing
+                    Apply for Financing
                   </button>
                 </div>
 
@@ -715,13 +715,13 @@ export default function WealthPlanningTool() {
               
               <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-slate-100 space-y-6">
                 <div>
-                  <h3 className="font-headline text-xl font-bold text-slate-900">Verify Statement Parameters</h3>
-                  <p className="text-xs text-slate-400 mt-1">Configure high-integrity verified balances certificates for legal, mortgage, or financial audits.</p>
+                  <h3 className="font-headline text-xl font-bold text-slate-900">Generate Official Statement</h3>
+                  <p className="text-xs text-slate-400 mt-1">Create an official cooperative account statement for visa, loan, or official verification purposes.</p>
                 </div>
 
                 {/* Select Account */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 ml-1">Asset Category Balance to Certify</label>
+                  <label className="text-xs font-bold text-slate-500 ml-1">Select Account</label>
                   <select
                     value={exportAccount}
                     onChange={(e) => setExportAccount(e.target.value as any)}
@@ -737,22 +737,22 @@ export default function WealthPlanningTool() {
 
                 {/* Submitting Entity Name input */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 ml-1">Recipient Destination or Verification Board</label>
+                  <label className="text-xs font-bold text-slate-500 ml-1">Addressed To (Optional)</label>
                   <input 
                     type="text"
                     value={exportEntity}
                     onChange={(e) => setExportEntity(e.target.value)}
-                    placeholder="e.g. State Agricultural Trust / Embassy"
+                    placeholder="e.g. Embassy, Bank, or Official Organization"
                     className="w-full bg-slate-50 border border-slate-150 rounded-2xl py-4 px-6 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500"
                   />
                   <p className="text-[10px] text-slate-450 text-slate-400 leading-normal ml-1">
-                    Prints on statement header. Confirms specific validity limits and limits secondary disclosure.
+                    Appears in the statement header for your intended recipient.
                   </p>
                 </div>
 
                 {/* Custom reference code generating options */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 ml-1">Assigned Verification Audit Code</label>
+                  <label className="text-xs font-bold text-slate-500 ml-1">Verification Code</label>
                   <div className="flex gap-3">
                     <input 
                       type="text"
@@ -764,7 +764,7 @@ export default function WealthPlanningTool() {
                       onClick={() => setExportReferenceCode('ZMC-CERT-2026-X' + Math.floor(10000 + Math.random() * 90000))}
                       className="px-4 py-3 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-600 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer"
                     >
-                      Regen GID
+                      New Code
                     </button>
                   </div>
                 </div>
@@ -778,12 +778,12 @@ export default function WealthPlanningTool() {
                   {isStatementGenerating ? (
                     <>
                       <RotateCcw className="w-5 h-5 animate-spin" />
-                      <span>Sealing Signatures...</span>
+                      <span>Generating Statement...</span>
                     </>
                   ) : (
                     <>
                       <Printer className="w-5 h-5" />
-                      <span>Compile Stamped PDF Statement</span>
+                      <span>Download / Print Statement</span>
                     </>
                   )}
                 </button>
@@ -798,13 +798,13 @@ export default function WealthPlanningTool() {
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs uppercase tracking-wider ml-1">
                   <CheckCircle size={14} />
-                  <span>Real-time Document Compiler</span>
+                  <span>Document Preview</span>
                 </div>
                 <h4 className="font-headline text-2xl font-black text-slate-900 leading-snug">
-                  High-Fidelity Virtual Preview
+                  Statement Preview
                 </h4>
                 <p className="text-slate-500 text-sm leading-relaxed">
-                  Below lies your print-optimized co-op balance certification ledger document. Press the primary action button to review or print directly.
+                  Here is a preview of your official account statement. You can download or print it directly.
                 </p>
               </div>
 
@@ -813,7 +813,7 @@ export default function WealthPlanningTool() {
                 {/* Background watermarks or seals */}
                 <div className="absolute right-12 bottom-12 w-48 h-48 bg-emerald-500/5 rounded-full border border-emerald-500/10 flex items-center justify-center pointer-events-none -rotate-12">
                   <p className="text-[10px] text-emerald-600/40 font-bold font-mono text-center tracking-widest leading-6 uppercase">
-                    ZIMCO COOPERATIVE <br /> VERIFIED SEAL <br /> 2026
+                    ZIMCO COOPERATIVE <br /> OFFICIAL SEAL <br /> 2026
                   </p>
                 </div>
 
@@ -823,13 +823,13 @@ export default function WealthPlanningTool() {
                     <img src={zimcoLogo} className="w-12 h-12 rounded-full border-2 border-emerald-600/30 object-cover" />
                     <div>
                       <h5 className="font-headline font-black text-emerald-950 font-bold tracking-tight text-sm">ZIMCO COOPERATIVE SOCIETY LTD</h5>
-                      <span className="text-[9px] text-slate-400 font-mono font-bold">STATE REGISTRATION GID: ZIM-COOP-921-X</span>
+                      <span className="text-[9px] text-slate-400 font-mono font-bold">REGISTRATION NUMBER: ZIM-COOP-921-X</span>
                     </div>
                   </div>
                   
                   {/* High Contrast Green Seal Badge */}
                   <div className="px-3 py-1.5 bg-emerald-50 border border-emerald-500/20 text-emerald-800 text-[10px] font-mono font-black rounded-lg">
-                    VERIFIED COMPLIANT
+                    VERIFIED OFFICIAL
                   </div>
                 </div>
 
@@ -838,12 +838,12 @@ export default function WealthPlanningTool() {
                   {/* Verification Destination Address Banner */}
                   <div className="grid grid-cols-2 gap-4 text-[10px] font-mono text-slate-400">
                     <div>
-                      <p className="font-bold">MEMBER PROFILE DETAILS</p>
+                      <p className="font-bold">MEMBER DETAILS</p>
                       <p className="text-slate-800 font-bold text-xs mt-0.5">JOHN DOE</p>
                       <p className="text-slate-500">MEMBER ID: ZIMCO-MEM-2026-9812</p>
                     </div>
                     <div>
-                      <p className="font-bold">SUBMITTED FOR VERIFICATION TO</p>
+                      <p className="font-bold">ADDRESSED TO</p>
                       <p className="text-slate-800 font-bold text-xs mt-0.5 uppercase">{exportEntity}</p>
                       <p className="text-slate-550 text-slate-500 font-bold font-mono">CODE: {exportReferenceCode}</p>
                     </div>
@@ -852,9 +852,9 @@ export default function WealthPlanningTool() {
                   {/* Certified Balances table */}
                   <div className="border border-slate-100 rounded-xl overflow-hidden mt-6 bg-slate-50/50">
                     <div className="grid grid-cols-3 gap-2 bg-slate-150 p-2 text-[9px] font-mono text-slate-400 uppercase tracking-wider font-extrabold border-b border-slate-100">
-                      <span>Certified Ledger Group</span>
-                      <span className="text-right">Risk Factor</span>
-                      <span className="text-right text-slate-800">Ledger Balance (₦)</span>
+                      <span>Account Type</span>
+                      <span className="text-right">Status</span>
+                      <span className="text-right text-slate-800">Balance (₦)</span>
                     </div>
 
                     <div className="grid grid-cols-3 gap-2 p-3 text-[11px] font-mono">
@@ -865,7 +865,7 @@ export default function WealthPlanningTool() {
                          exportAccount === 'cp' ? 'Commodity Account (CP)' :
                          'Muslim Community Account (MCA)'}
                       </span>
-                      <span className="text-slate-400 text-right font-bold">0.0% Compliant</span>
+                      <span className="text-slate-400 text-right font-bold">Active</span>
                       <span className="text-right font-black text-emerald-850 text-emerald-800 text-xs">
                         {exportAccount === 'os' ? '₦2,450,000.00' :
                          exportAccount === 'ss' ? '₦450,000.00' :
@@ -877,7 +877,7 @@ export default function WealthPlanningTool() {
                   </div>
 
                   <p className="text-[10px] text-slate-500 leading-normal italic text-justify pt-2">
-                    "This certifies that the cooperative balances listed above represent verified ledger shares securely maintained inside the joint asset pool of ZIMCO Cooperative Society Nigeria. No usurious values, secondary derivatives, or interest accumulations are charged or logged."
+                    "This certifies that the account balances listed above represent verified member funds securely held by ZIMCO Cooperative Society Limited. All funds are backed by real assets in full compliance with Nigerian cooperative regulations."
                   </p>
                 </div>
 
@@ -886,9 +886,9 @@ export default function WealthPlanningTool() {
                   <div className="flex items-center gap-2">
                     <QrCode size={40} className="text-slate-800 shrink-0" />
                     <div className="font-mono text-[8px] text-slate-400">
-                      <p className="font-bold">SECURITY TRACE QR</p>
-                      <p>Scan to verify with</p>
-                      <p>zimmercoop.com ledger</p>
+                      <p className="font-bold">VERIFICATION QR</p>
+                      <p>Scan to verify at</p>
+                      <p>zimcocoop.com</p>
                     </div>
                   </div>
 
@@ -922,7 +922,7 @@ export default function WealthPlanningTool() {
       {/* PRINT OPTIMIZED SHEET LAYOUT FULL DIALOG */}
       <AnimatePresence>
         {showStatementModal && (
-          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -947,10 +947,10 @@ export default function WealthPlanningTool() {
                     <FileText size={36} className="text-emerald-700" />
                   </div>
                   <h3 className="font-headline text-2xl font-black text-slate-900 leading-snug">
-                    CO-OP ACCOUNT STATEMENT SUMMARY EXPORTER
+                    OFFICIAL ACCOUNT STATEMENT
                   </h3>
                   <p className="text-xs text-slate-500 font-bold font-mono tracking-widest uppercase">
-                    Verification code trace: {exportReferenceCode}
+                    Verification Code: {exportReferenceCode}
                   </p>
                 </div>
 
@@ -960,7 +960,7 @@ export default function WealthPlanningTool() {
                   {/* Decorative stamp watermark behind printable sheets */}
                   <div className="absolute right-12 bottom-12 w-64 h-64 bg-emerald-500/5 rounded-full border border-emerald-500/10 flex items-center justify-center pointer-events-none -rotate-12">
                     <div className="text-[10px] text-emerald-600/40 font-bold font-mono text-center tracking-widest leading-6 uppercase">
-                      ZIMCO COOPERATIVE <br /> OFFICIAL STAMP <br /> DIGITAL VERIFIED <br /> 2026.3
+                      ZIMCO COOPERATIVE <br /> OFFICIAL STAMP <br /> VERIFIED <br /> 2026
                     </div>
                   </div>
 
@@ -975,14 +975,14 @@ export default function WealthPlanningTool() {
                     </div>
 
                     <div className="bg-emerald-50 border border-emerald-500/25 text-emerald-850 text-emerald-800 text-[10px] font-mono font-black py-2 px-4 rounded-xl text-center shrink-0">
-                      SECURE CERTIFICATE
+                      OFFICIAL STATEMENT
                     </div>
                   </div>
 
                   {/* Grid details */}
                   <div className="grid grid-cols-2 gap-8 text-[11px] font-mono">
                     <div className="space-y-1">
-                      <p className="font-extrabold text-slate-400 uppercase tracking-wider">Cooperative Member details</p>
+                      <p className="font-extrabold text-slate-400 uppercase tracking-wider">Member Details</p>
                       <p className="text-slate-800 font-black text-xs">JOHN DOE</p>
                       <p className="text-slate-500">MEMBER ID: ZIMCO-MEM-2026-9812</p>
                       <p className="text-slate-500">CONTACT: +234 812 345 6789</p>
@@ -990,11 +990,11 @@ export default function WealthPlanningTool() {
                     </div>
 
                     <div className="space-y-1 text-right">
-                      <p className="font-extrabold text-slate-400 uppercase tracking-wider">Validation specifications</p>
+                      <p className="font-extrabold text-slate-400 uppercase tracking-wider">Verification Details</p>
                       <p className="text-slate-800 font-black text-xs uppercase">{exportEntity}</p>
-                      <p className="text-slate-500">AUDIT REF: {exportReferenceCode}</p>
-                      <p className="text-slate-500">DATE COMPILED: June 01, 2026</p>
-                      <p className="text-[10px] text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full inline-block mt-1 font-bold">STATUS: COMPLIANT</p>
+                      <p className="text-slate-500">REFERENCE: {exportReferenceCode}</p>
+                      <p className="text-slate-500">DATE ISSUED: June 01, 2026</p>
+                      <p className="text-[10px] text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full inline-block mt-1 font-bold">STATUS: VERIFIED</p>
                     </div>
                   </div>
 
@@ -1003,46 +1003,46 @@ export default function WealthPlanningTool() {
                     <table className="w-full text-left text-xs font-semibold">
                       <thead>
                         <tr className="bg-slate-150 border-b border-slate-200 text-slate-400 font-mono font-bold text-[10px] uppercase tracking-wider">
-                          <th className="py-3.5 px-5">Cooperative Division Accounts</th>
-                          <th className="py-3.5 px-5">Compliance Standard</th>
-                          <th className="py-3.5 px-5 text-right text-slate-800">Verified Ledger Balance (₦)</th>
+                          <th className="py-3.5 px-5">Account</th>
+                          <th className="py-3.5 px-5">Account Type</th>
+                          <th className="py-3.5 px-5 text-right text-slate-800">Balance (₦)</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 text-slate-600 font-mono text-[11px]">
                         
                         <tr>
-                          <td className="py-4 px-5">Ordinary Savings (OS) Equity Shares</td>
-                          <td className="py-4 px-5 font-bold text-slate-400">Fixed Preserved Shares</td>
+                          <td className="py-4 px-5">Ordinary Savings (OS)</td>
+                          <td className="py-4 px-5 font-bold text-slate-400">Regular Savings</td>
                           <td className="py-4 px-5 text-right text-slate-800 font-bold">₦2,450,000.00</td>
                         </tr>
 
                         <tr className="bg-white">
-                          <td className="py-4 px-5">Special Savings (SS) Liquidity Buffer</td>
-                          <td className="py-4 px-5 font-bold text-slate-400">Asset-Backed Pro-Rata Yield</td>
+                          <td className="py-4 px-5">Special Savings (SS)</td>
+                          <td className="py-4 px-5 font-bold text-slate-400">Target Savings</td>
                           <td className="py-4 px-5 text-right text-slate-800 font-bold">₦450,000.00</td>
                         </tr>
 
                         <tr>
-                          <td className="py-4 px-5">Investment Account (IA) - Agriculture Pool</td>
-                          <td className="py-4 px-5 font-bold text-slate-400">Murabaha Lease Shares</td>
+                          <td className="py-4 px-5">Investment Account (IA)</td>
+                          <td className="py-4 px-5 font-bold text-slate-400">Agriculture Pool</td>
                           <td className="py-4 px-5 text-right text-slate-800 font-bold">₦1,200,000.00</td>
                         </tr>
 
                         <tr className="bg-white">
-                          <td className="py-4 px-5">Commodity Account (CP) Murabaha Stock</td>
-                          <td className="py-4 px-5 font-bold text-slate-400">Physical Sinking Pool</td>
+                          <td className="py-4 px-5">Commodity Account (CP)</td>
+                          <td className="py-4 px-5 font-bold text-slate-400">Asset Financing</td>
                           <td className="py-4 px-5 text-right text-slate-800 font-bold">₦150,000.00</td>
                         </tr>
 
                         <tr>
                           <td className="py-4 px-5 font-bold text-emerald-900">
-                            {exportAccount === 'os' ? 'Ordinary Savings (OS) Certified Portfolio' :
-                             exportAccount === 'ss' ? 'Special Savings (SS) Certified Portfolio' :
-                             exportAccount === 'ia' ? 'Investment Account (IA) Certified Portfolio' :
-                             exportAccount === 'cp' ? 'Commodity Account (CP) Certified Portfolio' :
-                             'Muslim Community Account (MCA) Certified Portfolio'}
+                            {exportAccount === 'os' ? 'Ordinary Savings (OS)' :
+                             exportAccount === 'ss' ? 'Special Savings (SS)' :
+                             exportAccount === 'ia' ? 'Investment Account (IA)' :
+                             exportAccount === 'cp' ? 'Commodity Account (CP)' :
+                             'Muslim Community Account (MCA)'}
                           </td>
-                          <td className="py-4 px-5 font-bold text-emerald-700 uppercase">SPECIFIED AUDIT ACCOUNT</td>
+                          <td className="py-4 px-5 font-bold text-emerald-700 uppercase">SELECTED ACCOUNT</td>
                           <td className="py-4 px-5 text-right font-black text-emerald-850 text-emerald-800 text-sm">
                             {exportAccount === 'os' ? '₦2,450,000.00' :
                              exportAccount === 'ss' ? '₦450,000.00' :
@@ -1058,9 +1058,9 @@ export default function WealthPlanningTool() {
 
                   {/* Declaration text */}
                   <div className="p-5 rounded-2xl bg-amber-50/50 border border-amber-200/40 text-[10px] text-amber-900 leading-relaxed font-body">
-                    <p className="font-bold uppercase tracking-wider mb-1 block">ZIMCO LEGAL COMPLIANCE AFFILIATION STATEMENT</p>
+                    <p className="font-bold uppercase tracking-wider mb-1 block">OFFICIAL DECLARATION</p>
                     <p>
-                      This balance summary certificate certifies that the member specified maintains verified ledger stakes backed by real assets in compliance with Agricultural Union frameworks and Non-Usury Finance rules. No compounded debt parameters are applicable. ZIMCO preserves data following NDPR standards. Scanning the securely generated security QR trace verifies that this transcript matches our internal data registries.
+                      This document certifies that the member named above holds the verified account balances listed with ZIMCO Cooperative Society Limited. All funds are backed by real assets in full compliance with Nigerian cooperative regulations. Scanning the QR code verifies this statement with our official records.
                     </p>
                   </div>
 
@@ -1069,8 +1069,8 @@ export default function WealthPlanningTool() {
                     <div className="flex items-center gap-3">
                       <QrCode size={48} className="text-slate-850 shrink-0" />
                       <div className="font-mono text-[8px] text-slate-400 leading-relaxed">
-                        <p className="font-extrabold text-slate-800 uppercase tracking-wide">SECURE DIGITAL QR TRACE</p>
-                        <p>ZIMCO Audit Cryptographic ID</p>
+                        <p className="font-extrabold text-slate-800 uppercase tracking-wide">VERIFICATION QR CODE</p>
+                        <p>ZIMCO Verification Code</p>
                         <p className="font-bold text-slate-600">{exportReferenceCode}</p>
                       </div>
                     </div>

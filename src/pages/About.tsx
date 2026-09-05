@@ -42,37 +42,37 @@ export default function About() {
         </div>
 
         {/* Mission/Vision */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-32">
-          <div className="p-12 rounded-[3rem] bg-emerald-900 text-white">
-            <Target className="w-12 h-12 mb-8 text-emerald-400" />
-            <h2 className="font-headline text-3xl font-bold mb-6">Our Mission</h2>
-            <p className="text-emerald-100/80 text-lg leading-relaxed">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 mb-20 sm:mb-32">
+          <div className="p-6 sm:p-8 md:p-12 rounded-2xl sm:rounded-[2.5rem] md:rounded-[3rem] bg-emerald-900 text-white">
+            <Target className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 mb-4 sm:mb-6 md:mb-8 text-emerald-400" />
+            <h2 className="font-headline text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">Our Mission</h2>
+            <p className="text-emerald-100/80 text-sm sm:text-base md:text-lg leading-relaxed">
               To provide accessible, interest-free financial services that empower our members to achieve financial independence while adhering to universal ethical standards.
             </p>
           </div>
-          <div className="p-12 rounded-[3rem] bg-surface-container-low border border-slate-100">
-            <Heart className="w-12 h-12 mb-8 text-primary" />
-            <h2 className="font-headline text-3xl font-bold mb-6">Our Vision</h2>
-            <p className="text-on-surface-variant text-lg leading-relaxed">
+          <div className="p-6 sm:p-8 md:p-12 rounded-2xl sm:rounded-[2.5rem] md:rounded-[3rem] bg-surface-container-low border border-slate-100">
+            <Heart className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 mb-4 sm:mb-6 md:mb-8 text-primary" />
+            <h2 className="font-headline text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">Our Vision</h2>
+            <p className="text-on-surface-variant text-sm sm:text-base md:text-lg leading-relaxed">
               To become the most trusted and impactful co-operative society in Africa, setting the gold standard for ethical finance and community-driven prosperity.
             </p>
           </div>
         </div>
 
         {/* Values */}
-        <div className="text-center mb-20">
-          <h2 className="font-headline text-4xl font-extrabold mb-16 tracking-tight">Our Core Values</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="text-center mb-16 sm:mb-20">
+          <h2 className="font-headline text-3xl sm:text-4xl font-extrabold mb-10 sm:mb-16 tracking-tight">Our Core Values</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
             {[
               { title: "Integrity", desc: "Honesty in every transaction and transparency in every audit." },
               { title: "Equity", desc: "Fair distribution of profits and equal opportunities for all members." },
               { title: "Solidarity", desc: "Standing together to support each other's growth and resilience." },
               { title: "Excellence", desc: "Striving for the highest quality in our services and operations." }
             ].map((value) => (
-              <div key={value.title} className="p-8 rounded-3xl bg-white border border-slate-100 hover:border-primary/30 transition-colors">
-                <Award className="w-10 h-10 text-primary mx-auto mb-6" />
-                <h3 className="font-headline text-xl font-bold mb-3">{value.title}</h3>
-                <p className="text-on-surface-variant text-sm leading-relaxed">{value.desc}</p>
+              <div key={value.title} className="p-5 sm:p-6 md:p-8 rounded-2xl md:rounded-3xl bg-white border border-slate-100 hover:border-primary/30 transition-colors">
+                <Award className="w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 text-primary mx-auto mb-3 sm:mb-4 md:mb-6" />
+                <h3 className="font-headline text-lg sm:text-xl font-bold mb-2 sm:mb-3">{value.title}</h3>
+                <p className="text-on-surface-variant text-xs sm:text-sm leading-relaxed">{value.desc}</p>
               </div>
             ))}
           </div>

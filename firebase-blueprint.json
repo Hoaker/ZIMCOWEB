@@ -1,0 +1,93 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Represents a member or administrative profile in the system.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "id": { "type": "string" },
+        "fullName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "dob": { "type": "string" },
+        "department": { "type": "string" },
+        "role": { "type": "string", "enum": ["member", "Bursary Management", "Loan Approvals", "Society Audit", "Stock Management", "Admin"] },
+        "ordinarySavings": { "type": "number" },
+        "specialSavings": { "type": "number" },
+        "investmentAmount": { "type": "number" },
+        "commoditySavings": { "type": "number" },
+        "muslimCommunitySavings": { "type": "number" },
+        "muslimSavings": { "type": "number" },
+        "outstandingLoans": { "type": "number" },
+        "kycStatus": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "id", "fullName", "email", "role"]
+    },
+    "EmailMapping": {
+      "title": "Email to Member ID Mapping",
+      "description": "Maps a lowercase email address to a member or admin ID for login lookups.",
+      "type": "object",
+      "properties": {
+        "memberId": { "type": "string" }
+      },
+      "required": ["memberId"]
+    },
+    "Transaction": {
+      "title": "Member Ledger Transaction",
+      "description": "Represents a transaction in a member's savings or loan ledger.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "description": { "type": "string" },
+        "amount": { "type": "string" },
+        "account": { "type": "string" },
+        "type": { "type": "string", "enum": ["credit", "debit"] },
+        "reference": { "type": "string" },
+        "channel": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["date", "description", "amount", "account", "type"]
+    },
+    "Notification": {
+      "title": "Member Notification",
+      "description": "Represents an automated SMS, Email, or In-App notification dispatched to a member.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "memberId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "category": { "type": "string", "enum": ["topup", "deduction", "loan", "security", "statement", "general"] },
+        "channels": { "type": "string" },
+        "smsDelivered": { "type": "string" },
+        "emailDelivered": { "type": "string" },
+        "smsText": { "type": "string" },
+        "emailHtml": { "type": "string" },
+        "isRead": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "reference": { "type": "string" }
+      },
+      "required": ["id", "memberId", "title", "message", "category", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{memberId}": {
+      "schema": "User",
+      "description": "Users collection containing both members and administrators."
+    },
+    "/emailToMember/{email}": {
+      "schema": "EmailMapping",
+      "description": "Lowercase email mapping table for ID lookups."
+    },
+    "/users/{memberId}/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Ledger transactions subcollection for each member."
+    },
+    "/users/{memberId}/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "Automated SMS, Email, and in-app notifications subcollection."
+    }
+  }
+}

@@ -174,11 +174,11 @@ export default function Compliance() {
           clearInterval(interval);
           setTimeout(() => {
             setDownloadingId(null);
-            setDownloadSuccessMsg(`Downloaded ${doc.referenceNumber} successfully. Integrity Signature SHA-256 validated.`);
+            setDownloadSuccessMsg(`Downloaded ${doc.referenceNumber} successfully. Document verified.`);
             
             // Trigger actual browser download mock with virtual string
             const element = document.createElement("a");
-            const file = new Blob([`ZIMCO SECURE DOCUMENT ARCHIVE\nRef: ${doc.referenceNumber}\nDate Issued: ${doc.publishDate}\nSHA-256 Hash: ${doc.sha256}\n\nThis certifies document integrity for regional state audit boards.`], {type: 'text/plain'});
+            const file = new Blob([`ZIMCO OFFICIAL DOCUMENT ARCHIVE\nRef: ${doc.referenceNumber}\nDate Issued: ${doc.publishDate}\nVerification Code: ${doc.sha256}\n\nThis certifies document validity for ZIMCO Cooperative Society.`], {type: 'text/plain'});
             element.href = URL.createObjectURL(file);
             element.download = `${doc.title.toLowerCase().replace(/[^a-z0-9]/g, "_")}.txt`;
             document.body.appendChild(element);
@@ -211,10 +211,10 @@ export default function Compliance() {
         </div>
         <h1 className="font-headline text-4xl sm:text-6xl font-extrabold text-slate-900 tracking-tight leading-tight">
           Regulatory Compliance <br className="hidden sm:inline" />
-          <span className="text-emerald-800 font-black">& Document Repository</span>
+          <span className="text-emerald-800 font-black">& Official Documents</span>
         </h1>
         <p className="text-slate-600 font-body text-base sm:text-lg leading-relaxed">
-          ZIMCO Cooperative operates under strict structural guidelines certified by state ministries and advisory Councils. We support structural transparency by providing members with audited statements and public registries.
+          ZIMCO Cooperative operates under strict structural guidelines certified by state ministries and advisory Councils. We support transparency by providing members with audited statements and official records.
         </p>
       </section>
 
@@ -231,7 +231,7 @@ export default function Compliance() {
             </h2>
           </div>
           <div className="p-4 rounded-2xl bg-slate-50 border border-slate-150 text-xs text-slate-500 leading-relaxed font-mono max-w-md">
-            Click any active badge below to inspect official regulatory signatories, expiry bounds, and immutable zero-interest framework compliance logs.
+            Click any active badge below to view official signers, expiration dates, and non-interest compliance records.
           </div>
         </div>
 
@@ -298,7 +298,7 @@ export default function Compliance() {
               Central Resource & Document Hub
             </h2>
             <p className="text-slate-500 text-sm mt-1 max-w-xl">
-              Inspect verified legal records, cooperative unions regulations, bylaws, and audited balance sheets. File checksums are provided for audit boards validation.
+              Inspect verified legal records, cooperative regulations, bylaws, and audited financial statements. Verification codes are provided for official verification.
             </p>
           </div>
 
@@ -309,7 +309,7 @@ export default function Compliance() {
             </span>
             <input 
               type="text"
-              placeholder="Search documents, IDs, or audit terms..."
+              placeholder="Search documents, IDs, or topics..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-slate-50 border border-slate-150 rounded-full py-3.5 pl-12 pr-6 text-sm font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
@@ -351,7 +351,7 @@ export default function Compliance() {
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <div>
                 <p>{downloadSuccessMsg}</p>
-                <span className="text-[10px] text-emerald-600/70 font-mono">Status: 200 OK • Download Triggered Successfully</span>
+                <span className="text-[10px] text-emerald-600/70 font-mono">Status: Ready • Download Completed Successfully</span>
               </div>
             </div>
             <button onClick={() => setDownloadSuccessMsg(null)} className="text-emerald-900 hover:text-emerald-700">
@@ -395,18 +395,18 @@ export default function Compliance() {
                         {doc.description}
                       </p>
 
-                      {/* Cryptographic SHA-256 Stamp */}
+                      {/* Document Verification Code */}
                       <div className="flex items-center gap-2 pt-1">
                         <Lock size={12} className="text-slate-400 shrink-0" />
                         <span className="text-[10px] text-slate-400 font-mono bg-white px-2 py-0.5 rounded border border-slate-150 max-w-full overflow-hidden text-ellipsis whitespace-nowrap">
-                          SHA-256 Checksum: {doc.sha256}
+                          Security Verification Code: {doc.sha256}
                         </span>
                       </div>
                     </div>
 
                     <div className="flex flex-row lg:flex-col lg:items-end justify-between lg:justify-center gap-4 w-full lg:w-auto pt-6 lg:pt-0 border-t lg:border-t-0 border-slate-250 border-slate-200">
                       <div className="text-left lg:text-right">
-                        <p className="text-xs text-slate-400 font-bold uppercase font-mono tracking-wider">File Metadata</p>
+                        <p className="text-xs text-slate-400 font-bold uppercase font-mono tracking-wider">File Information</p>
                         <p className="text-sm font-bold text-slate-700">{doc.fileSize}</p>
                         <p className="text-[10px] text-slate-500 font-mono mt-0.5">{doc.authority}</p>
                       </div>
@@ -455,25 +455,25 @@ export default function Compliance() {
       <section className="p-8 bg-slate-900 text-white rounded-[3rem] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
         <div className="space-y-2 max-w-xl">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 rounded-full text-[10px] font-bold tracking-wider uppercase font-mono">
-            State Regulated Operations Buffer
+            Government Regulated Cooperative
           </div>
           <h3 className="font-headline text-xl font-bold">Nigeria Cooperative Union Oversight</h3>
           <p className="text-xs text-slate-400 leading-relaxed">
-            All savings allocation modules, joint mutual partnerships, agricultural leasing options, and Shari’ah boards balances are reported quarterly to state ministries of commerce and agriculture. Audit trails can be physically verified under the cooperative registrations act of Nigeria.
+            All savings allocation modules, joint mutual partnerships, agricultural leasing options, and non-interest accounts are reported quarterly to state ministries of commerce and agriculture. Records can be verified under the cooperative registrations act of Nigeria.
           </p>
         </div>
         
         <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700 flex flex-col gap-3 font-mono shrink-0 w-full md:w-auto text-xs">
           <div className="flex justify-between gap-10">
-            <span className="text-slate-400">STATE REGISTRATION GID:</span>
+            <span className="text-slate-400">STATE REGISTRATION ID:</span>
             <span className="text-emerald-400 font-bold">ZIM-COOP-921-X</span>
           </div>
           <div className="flex justify-between gap-10">
-            <span className="text-slate-400">PORTFOLIO INTEGRITY KEY:</span>
-            <span className="text-emerald-400 font-bold">HMAC-SHA256-ACTIVE</span>
+            <span className="text-slate-400">SYSTEM STATUS:</span>
+            <span className="text-emerald-400 font-bold">VERIFIED & ACTIVE</span>
           </div>
           <div className="flex justify-between gap-10">
-            <span className="text-slate-400">COMPLIANCE SEALS VERIFICATION:</span>
+            <span className="text-slate-400">COMPLIANCE SEALS:</span>
             <span className="text-emerald-400 font-bold">3 PASSED • 100% OK</span>
           </div>
         </div>
@@ -535,7 +535,7 @@ export default function Compliance() {
                     <p className="font-bold text-slate-700 mt-0.5">{selectedCertificate.issueDate}</p>
                   </div>
                   <div>
-                    <p className="text-slate-400">EXPIRATION THRESHOLD:</p>
+                    <p className="text-slate-400">EXPIRATION DATE:</p>
                     <p className="font-bold text-slate-700 mt-0.5">{selectedCertificate.expiryDate}</p>
                   </div>
                 </div>
@@ -557,13 +557,12 @@ export default function Compliance() {
                 <div className="pt-4 flex justify-end">
                   <button 
                     onClick={() => {
-                      // Trigger mock printing or signing confirm alert
-                      alert(`Certificate verify check success. Trace signature ID: ZMCO-ETH-SIG-${Math.floor(100000 + Math.random() * 900000)} is intact.`);
+                      alert(`Certificate verified successfully. Trace ID: ZMCO-ETH-SIG-${Math.floor(100000 + Math.random() * 900000)}.`);
                     }}
                     className="px-6 py-3 bg-emerald-900 text-white rounded-xl text-xs font-bold hover:bg-emerald-800 transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
                     <ShieldCheck size={16} />
-                    <span>Print Cryptographic Record</span>
+                    <span>Print Official Record</span>
                   </button>
                 </div>
               </div>

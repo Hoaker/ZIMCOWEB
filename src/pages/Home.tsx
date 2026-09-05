@@ -1,5 +1,17 @@
 import { Link } from 'react-router-dom';
-import { Leaf, Users, Eye, ArrowRight, TrendingUp, Quote } from 'lucide-react';
+import { 
+  Leaf, 
+  Users, 
+  Eye, 
+  ArrowRight, 
+  TrendingUp, 
+  GraduationCap, 
+  BookOpen, 
+  Sparkles, 
+  HandCoins, 
+  ShieldCheck, 
+  CheckCircle2 
+} from 'lucide-react';
 import { motion } from 'motion/react';
 
 export default function Home() {
@@ -44,181 +56,247 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Trust Ribbon */}
-      <section className="bg-surface-container-low py-10 relative z-30 -mt-10 mx-8 rounded-3xl shadow-2xl">
-        <div className="max-w-7xl mx-auto px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 divide-y md:divide-y-0 md:divide-x divide-outline-variant/30 text-center md:text-left">
-            <div className="flex flex-col items-center md:items-start md:px-8">
-              <span className="text-3xl font-headline font-extrabold text-primary">10,000+</span>
-              <span className="text-on-surface-variant font-label text-sm uppercase tracking-widest mt-1">Active Members</span>
-            </div>
-            <div className="flex flex-col items-center md:items-start md:px-8 pt-6 md:pt-0">
-              <span className="text-3xl font-headline font-extrabold text-primary">₦2.5B+</span>
-              <span className="text-on-surface-variant font-label text-sm uppercase tracking-widest mt-1">Total Assets</span>
-            </div>
-            <div className="flex flex-col items-center md:items-start md:px-8 pt-6 md:pt-0">
-              <span className="text-3xl font-headline font-extrabold text-primary">12 Years</span>
-              <span className="text-on-surface-variant font-label text-sm uppercase tracking-widest mt-1">Ethical Service</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Core Mission Pillars */}
-      <section className="py-32 px-8 max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-end mb-20 gap-8">
+      <section className="py-16 sm:py-24 md:py-32 px-4 sm:px-6 md:px-8 max-w-7xl mx-auto">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 sm:mb-20 gap-6 sm:gap-8">
           <div className="max-w-xl">
-            <h2 className="text-primary font-label font-bold uppercase tracking-[0.3em] text-sm mb-4">Our Foundations</h2>
-            <h3 className="font-headline text-4xl md:text-5xl font-extrabold text-on-surface tracking-tighter">Why ZIMCO Stands Apart?</h3>
+            <h2 className="text-primary font-label font-bold uppercase tracking-[0.3em] text-xs sm:text-sm mb-3 sm:mb-4">Our Foundations</h2>
+            <h3 className="font-headline text-3xl sm:text-4xl md:text-5xl font-extrabold text-on-surface tracking-tighter">Why ZIMCO Stands Apart?</h3>
           </div>
-          <p className="text-on-surface-variant max-w-md text-lg leading-relaxed">
+          <p className="text-on-surface-variant max-w-md text-sm sm:text-base md:text-lg leading-relaxed">
             We've built a financial ecosystem where ethics isn't an afterthought—it's the architecture of everything we do.
           </p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
           <motion.div 
             whileHover={{ y: -10 }}
-            className="p-10 rounded-3xl bg-surface-container-low hover:bg-surface-container transition-all duration-500 group"
+            className="p-6 sm:p-8 md:p-10 rounded-2xl sm:rounded-3xl bg-surface-container-low hover:bg-surface-container transition-all duration-500 group"
           >
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-8 group-hover:bg-primary group-hover:text-on-primary transition-all">
-              <Leaf className="w-8 h-8" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 rounded-xl sm:rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-5 sm:mb-8 group-hover:bg-primary group-hover:text-on-primary transition-all">
+              <Leaf className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8" />
             </div>
-            <h4 className="font-headline text-2xl font-bold mb-4">100% Interest-Free</h4>
-            <p className="text-on-surface-variant leading-relaxed">True ethical finance means no hidden usury. We grow through shared equity and tangible asset investment, never through debt burden.</p>
+            <h4 className="font-headline text-xl sm:text-2xl font-bold mb-3 sm:mb-4">100% Interest-Free</h4>
+            <p className="text-on-surface-variant text-sm sm:text-base leading-relaxed">True ethical finance means no hidden usury. We grow through shared equity and tangible asset investment, never through debt burden.</p>
           </motion.div>
           
           <motion.div 
             whileHover={{ y: -20 }}
-            className="p-10 rounded-3xl bg-primary text-on-primary shadow-2xl shadow-primary/30 md:-translate-y-8 transition-all duration-500"
+            className="p-6 sm:p-8 md:p-10 rounded-2xl sm:rounded-3xl bg-primary text-on-primary shadow-2xl shadow-primary/30 md:-translate-y-8 transition-all duration-500"
           >
-            <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center text-white mb-8">
-              <Users className="w-8 h-8" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 rounded-xl sm:rounded-2xl bg-white/20 flex items-center justify-center text-white mb-5 sm:mb-8">
+              <Users className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8" />
             </div>
-            <h4 className="font-headline text-2xl font-bold mb-4">Community-Led</h4>
-            <p className="text-white/80 leading-relaxed">ZIMCO is owned by its members. Every decision is made with the collective benefit in mind, ensuring our capital stays within the community.</p>
+            <h4 className="font-headline text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Community-Led</h4>
+            <p className="text-white/80 text-sm sm:text-base leading-relaxed">ZIMCO is owned by its members. Every decision is made with the collective benefit in mind, ensuring our capital stays within the community.</p>
           </motion.div>
 
           <motion.div 
             whileHover={{ y: -10 }}
-            className="p-10 rounded-3xl bg-surface-container-low hover:bg-surface-container transition-all duration-500 group"
+            className="p-6 sm:p-8 md:p-10 rounded-2xl sm:rounded-3xl bg-surface-container-low hover:bg-surface-container transition-all duration-500 group"
           >
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-8 group-hover:bg-primary group-hover:text-on-primary transition-all">
-              <Eye className="w-8 h-8" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 rounded-xl sm:rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-5 sm:mb-8 group-hover:bg-primary group-hover:text-on-primary transition-all">
+              <Eye className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8" />
             </div>
-            <h4 className="font-headline text-2xl font-bold mb-4">Total Transparency</h4>
-            <p className="text-on-surface-variant leading-relaxed">View every investment, audit, and decision through our open-ledger policy. We believe trust is earned through visible integrity.</p>
+            <h4 className="font-headline text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Total Transparency</h4>
+            <p className="text-on-surface-variant text-sm sm:text-base leading-relaxed">View every investment, audit, and decision through our open-ledger policy. We believe trust is earned through visible integrity.</p>
           </motion.div>
         </div>
       </section>
 
-      {/* Service Highlights */}
-      <section className="py-32 bg-on-surface text-white">
-        <div className="max-w-7xl mx-auto px-8">
-          <div className="text-center mb-20">
-            <h2 className="font-headline text-4xl md:text-5xl font-extrabold tracking-tighter">Financial Empowerment</h2>
+      {/* Service Highlights - Financial Empowerment */}
+      <section className="py-16 sm:py-24 md:py-28 bg-slate-950 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 relative z-10">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 sm:mb-16 gap-4 sm:gap-6">
+            <div>
+              <span className="text-emerald-400 font-label font-bold uppercase tracking-[0.25em] text-[10px] sm:text-xs mb-2 sm:mb-3 block">
+                Ethical Wealth Creation
+              </span>
+              <h2 className="font-headline text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tighter text-white">
+                Financial Empowerment
+              </h2>
+            </div>
+            <p className="text-slate-400 max-w-md text-sm sm:text-base leading-relaxed">
+              Equipping members with zero-interest financing, asset acquisition tools, and dividend-yielding collective portfolios.
+            </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-            <div className="md:col-span-8 group relative rounded-[2rem] overflow-hidden h-[400px]">
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-5 sm:gap-6">
+            <div className="md:col-span-8 group relative rounded-2xl sm:rounded-[2rem] overflow-hidden min-h-[300px] sm:min-h-[380px] border border-white/10">
               <img 
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 brightness-75" 
                 alt="Thrift Savings" 
                 src="https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?q=80&w=2071&auto=format&fit=crop"
                 referrerPolicy="no-referrer"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-10 flex flex-col justify-end">
-                <h4 className="font-headline text-3xl font-bold mb-2">Thrift Savings</h4>
-                <p className="text-white/70 max-w-sm mb-6">Grow your wealth systematically with automated contributions and profit-sharing dividends.</p>
-                <Link to="/services" className="flex items-center gap-2 font-bold group/link">
-                  Learn More 
-                  <ArrowRight className="w-5 h-5 group-hover/link:translate-x-2 transition-transform" />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-5 sm:p-8 md:p-10 flex flex-col justify-end">
+                <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-xs font-bold w-fit mb-3">
+                  Systematic Accumulation
+                </span>
+                <h4 className="font-headline text-2xl sm:text-3xl font-bold mb-2">Thrift & Special Savings</h4>
+                <p className="text-slate-300 max-w-md mb-4 sm:mb-6 text-xs sm:text-sm leading-relaxed">
+                  Grow your liquid capital systematically through automated deductions, dedicated target savings, and annual dividend distributions.
+                </p>
+                <Link to="/services" className="flex items-center gap-2 font-bold text-emerald-400 group/link text-xs sm:text-sm">
+                  Explore Savings Plans 
+                  <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover/link:translate-x-1.5 transition-transform" />
                 </Link>
               </div>
             </div>
 
-            <div className="md:col-span-4 group relative rounded-[2rem] overflow-hidden h-[400px]">
-              <div className="absolute inset-0 bg-primary/40 z-10"></div>
-              <img 
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
-                alt="Loans" 
-                src="https://images.unsplash.com/photo-1450101499163-c8848c66ca85?q=80&w=2070&auto=format&fit=crop"
-                referrerPolicy="no-referrer"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-primary/90 to-transparent p-10 flex flex-col justify-end z-20">
-                <h4 className="font-headline text-2xl font-bold mb-2">Zero-Interest Loans</h4>
-                <p className="text-white/70 mb-6">Access capital for business or personal needs without usury.</p>
-                <Link to="/services" className="flex items-center gap-2 font-bold">
-                  Get Funded
-                  <TrendingUp className="w-5 h-5" />
-                </Link>
+            <div className="md:col-span-4 group relative rounded-2xl sm:rounded-[2rem] overflow-hidden min-h-[300px] sm:min-h-[380px] border border-emerald-800/40 bg-gradient-to-b from-emerald-900 to-emerald-950 p-5 sm:p-8 flex flex-col justify-between">
+              <div>
+                <div className="w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-xl sm:rounded-2xl bg-white/10 flex items-center justify-center text-emerald-300 mb-4 sm:mb-6">
+                  <HandCoins className="w-4.5 h-4.5 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                </div>
+                <span className="px-3 py-1 bg-white/10 text-emerald-200 text-xs font-bold rounded-full uppercase tracking-wider mb-2 sm:mb-3 inline-block">
+                  100% Usury-Free
+                </span>
+                <h4 className="font-headline text-xl sm:text-2xl font-bold mb-2 sm:mb-3 text-white">Zero-Interest Loans</h4>
+                <p className="text-emerald-100/80 text-xs sm:text-sm leading-relaxed mb-4 sm:mb-6">
+                  Access ethical revolving credit for personal expansion, SME inventory, and family milestones with no interest burden.
+                </p>
+              </div>
+              <Link to="/join" className="inline-flex items-center justify-between p-3 sm:p-3.5 bg-white text-emerald-900 rounded-xl font-bold text-xs sm:text-sm hover:bg-emerald-50 transition-colors">
+                <span>Check Eligibility</span>
+                <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-700" />
+              </Link>
+            </div>
+
+            <div className="md:col-span-6 group relative rounded-2xl sm:rounded-[2rem] overflow-hidden min-h-[260px] sm:min-h-[300px] border border-white/10 p-5 sm:p-8 bg-slate-900 flex flex-col justify-between">
+              <div>
+                <div className="w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-xl sm:rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-4 sm:mb-6">
+                  <TrendingUp className="w-4.5 h-4.5 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                </div>
+                <h4 className="font-headline text-xl sm:text-2xl font-bold mb-2">Ethical Investment Pools</h4>
+                <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
+                  Direct member participation in verified agricultural value chains, real estate syndicates, and bulk commodity trading pools.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 sm:gap-4 pt-3 sm:pt-4 border-t border-slate-800">
+                <span className="text-[11px] sm:text-xs text-emerald-400 font-bold">12–18% Avg. Annual ROI</span>
+                <span className="text-xs text-slate-500">•</span>
+                <span className="text-[11px] sm:text-xs text-slate-400">Quarterly Audited</span>
               </div>
             </div>
 
-            <div className="md:col-span-12 group relative rounded-[2rem] overflow-hidden h-[300px]">
-              <img 
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
-                alt="Marketplace" 
-                src="https://images.unsplash.com/photo-1533900298318-6b8da08a523e?q=80&w=2070&auto=format&fit=crop"
-                referrerPolicy="no-referrer"
-              />
-              <div className="absolute inset-0 bg-black/50 p-10 flex flex-col justify-center items-center text-center">
-                <h4 className="font-headline text-3xl font-bold mb-4">Co-op Marketplace</h4>
-                <p className="text-white/80 max-w-xl mb-6">Leverage the collective buying power of 10,000 members to access essentials at wholesale prices.</p>
-                <button className="bg-primary px-8 py-3 rounded-full font-headline font-bold hover:bg-primary/90 transition-colors">
-                  Explore Marketplace
-                </button>
+            <div className="md:col-span-6 group relative rounded-2xl sm:rounded-[2rem] overflow-hidden min-h-[260px] sm:min-h-[300px] border border-white/10 p-5 sm:p-8 bg-slate-900 flex flex-col justify-between">
+              <div>
+                <div className="w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-xl sm:rounded-2xl bg-teal-500/10 text-teal-400 flex items-center justify-center mb-4 sm:mb-6">
+                  <ShieldCheck className="w-4.5 h-4.5 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                </div>
+                <h4 className="font-headline text-xl sm:text-2xl font-bold mb-2">Commodity & Asset Financing</h4>
+                <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
+                  Bulk purchasing power enables members to acquire home appliances, food staples, electronics, and land at wholesale rates with flexible installments.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 sm:gap-4 pt-3 sm:pt-4 border-t border-slate-800">
+                <span className="text-[11px] sm:text-xs text-teal-400 font-bold">Zero Markup Inflation</span>
+                <span className="text-xs text-slate-500">•</span>
+                <span className="text-[11px] sm:text-xs text-slate-400">Verified Vendors</span>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Testimonial Section */}
-      <section className="py-32 px-8">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="text-primary/20 mb-12 flex justify-center">
-            <Quote className="w-24 h-24 fill-current" />
-          </div>
-          <blockquote className="font-headline text-3xl md:text-4xl font-extrabold text-on-surface italic leading-tight mb-12 tracking-tighter">
-            "ZIMCO didn't just give me a loan; they gave me a path to dignity. Starting my agribusiness without the fear of compounding interest changed everything for my family's future."
-          </blockquote>
-          <div className="flex items-center justify-center gap-4">
-            <div className="w-16 h-16 rounded-full overflow-hidden border-4 border-primary/10">
-              <img 
-                className="w-full h-full object-cover" 
-                alt="Omotara Adeyemi" 
-                src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=1976&auto=format&fit=crop"
-                referrerPolicy="no-referrer"
-              />
-            </div>
-            <div className="text-left">
-              <p className="font-bold text-on-surface">Omotara Adeyemi</p>
-              <p className="text-on-surface-variant text-sm">Platinum Member since 2018</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Final CTA */}
-      <section className="py-24 px-8 mb-24">
-        <div className="max-w-7xl mx-auto rounded-[3rem] bg-gradient-to-br from-emerald-800 to-emerald-950 p-12 md:p-24 text-center relative overflow-hidden shadow-2xl">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl -mr-48 -mt-48"></div>
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary-container/20 rounded-full blur-2xl -ml-32 -mb-32"></div>
-          <div className="relative z-10">
-            <h2 className="font-headline text-4xl md:text-6xl font-extrabold text-white mb-8 tracking-tighter">Join the Society Today</h2>
-            <p className="text-white/70 text-xl max-w-2xl mx-auto mb-12">
-              Become part of an ethical financial movement that prioritizes your growth and our collective prosperity.
+      {/* Educational Services & Capacity Development */}
+      <section className="py-16 sm:py-24 md:py-28 px-4 sm:px-6 md:px-8 max-w-7xl mx-auto mb-16">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 sm:mb-16 gap-4 sm:gap-6">
+          <div className="max-w-2xl">
+            <span className="text-primary font-label font-bold uppercase tracking-[0.25em] text-[10px] sm:text-xs mb-2 sm:mb-3 block">
+              Knowledge & Capability
+            </span>
+            <h2 className="font-headline text-3xl sm:text-4xl md:text-5xl font-extrabold text-on-surface tracking-tighter">
+              Educational Services & Capacity Building
+            </h2>
+            <p className="text-on-surface-variant text-sm sm:text-base leading-relaxed mt-2 sm:mt-4">
+              We believe true financial freedom begins with education. ZIMCO conducts structured training, scholarship programs, and business bootcamps for members and their households.
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-              <Link to="/join" className="w-full sm:w-auto bg-white text-primary px-10 py-5 rounded-full font-headline font-extrabold text-xl shadow-xl hover:scale-105 transition-transform">
-                Create Free Account
-              </Link>
-              <Link to="/contact" className="w-full sm:w-auto bg-white/10 text-white backdrop-blur border border-white/20 px-10 py-5 rounded-full font-headline font-extrabold text-xl hover:bg-white/20 transition-all">
-                Talk to an Advisor
-              </Link>
-            </div>
           </div>
+          <Link 
+            to="/services" 
+            className="px-5 sm:px-6 py-2.5 sm:py-3 rounded-full bg-surface-container-low hover:bg-surface-container text-primary font-headline font-bold text-xs sm:text-sm transition-all flex items-center gap-2 self-start sm:self-auto"
+          >
+            All Programs <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
+          <motion.div 
+            whileHover={{ y: -8 }}
+            className="p-6 sm:p-7 md:p-8 rounded-2xl sm:rounded-3xl bg-surface-container-low border border-slate-100 flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-xl sm:rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-4 sm:mb-6">
+                <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" />
+              </div>
+              <span className="text-[11px] sm:text-xs font-bold text-primary uppercase tracking-widest block mb-1.5 sm:mb-2">Masterclasses</span>
+              <h3 className="font-headline text-xl sm:text-2xl font-bold text-on-surface mb-2 sm:mb-3">Sharia Financial Literacy</h3>
+              <p className="text-on-surface-variant text-xs sm:text-sm leading-relaxed mb-4 sm:mb-6">
+                Comprehensive workshops on non-interest accounting, wealth preservation, estate planning, and ethical household budgeting.
+              </p>
+            </div>
+            <ul className="space-y-2 pt-3 sm:pt-4 border-t border-slate-200/60 text-xs font-semibold text-slate-700">
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" /> Monthly Webinar Series
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" /> Free Certificate of Completion
+              </li>
+            </ul>
+          </motion.div>
+
+          <motion.div 
+            whileHover={{ y: -8 }}
+            className="p-6 sm:p-7 md:p-8 rounded-2xl sm:rounded-3xl bg-surface-container-low border border-slate-100 flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-xl sm:rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-4 sm:mb-6">
+                <GraduationCap className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" />
+              </div>
+              <span className="text-[11px] sm:text-xs font-bold text-emerald-700 uppercase tracking-widest block mb-1.5 sm:mb-2">Support Fund</span>
+              <h3 className="font-headline text-xl sm:text-2xl font-bold text-on-surface mb-2 sm:mb-3">Co-op Bursary & Student Support</h3>
+              <p className="text-on-surface-variant text-xs sm:text-sm leading-relaxed mb-4 sm:mb-6">
+                Dedicated educational grants and tuition relief facilities for dependents of active cooperative members in accredited tertiary institutions.
+              </p>
+            </div>
+            <ul className="space-y-2 pt-3 sm:pt-4 border-t border-slate-200/60 text-xs font-semibold text-slate-700">
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" /> Tuition Soft-Financing
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" /> Academic Merit Recognition
+              </li>
+            </ul>
+          </motion.div>
+
+          <motion.div 
+            whileHover={{ y: -8 }}
+            className="p-6 sm:p-7 md:p-8 rounded-2xl sm:rounded-3xl bg-surface-container-low border border-slate-100 flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-xl sm:rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center mb-4 sm:mb-6">
+                <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" />
+              </div>
+              <span className="text-[11px] sm:text-xs font-bold text-amber-800 uppercase tracking-widest block mb-1.5 sm:mb-2">Incubation</span>
+              <h3 className="font-headline text-xl sm:text-2xl font-bold text-on-surface mb-2 sm:mb-3">SME & Agritech Bootcamps</h3>
+              <p className="text-on-surface-variant text-xs sm:text-sm leading-relaxed mb-4 sm:mb-6">
+                Hands-on coaching for cooperative entrepreneurs covering sustainable farming techniques, digital marketing, supply chain and bookkeeping.
+              </p>
+            </div>
+            <ul className="space-y-2 pt-3 sm:pt-4 border-t border-slate-200/60 text-xs font-semibold text-slate-700">
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" /> 1-on-1 Business Mentorship
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" /> Seed Capital Matching
+              </li>
+            </ul>
+          </motion.div>
         </div>
       </section>
     </main>
   );
 }
+
