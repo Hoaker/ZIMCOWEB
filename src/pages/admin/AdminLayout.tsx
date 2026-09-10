@@ -66,15 +66,9 @@ export default function AdminLayout({ children, role, icon }: AdminLayoutProps) 
   };
 
   const navItems = [
-    { to: '/admin', icon: <LayoutDashboard className="w-4 h-4 sm:w-4.5 sm:h-4.5 md:w-5 md:h-5 shrink-0" />, label: 'Dashboard' },
-    { to: '/admin/members', icon: <Users className="w-4 h-4 sm:w-4.5 sm:h-4.5 md:w-5 md:h-5 shrink-0" />, label: 'Members' },
-    { to: '/admin/bursary', icon: <FileSpreadsheet className="w-4 h-4 sm:w-4.5 sm:h-4.5 md:w-5 md:h-5 shrink-0" />, label: 'Bursary Ledger' },
+    { to: '/admin', icon: <LayoutDashboard className="w-4 h-4 sm:w-4.5 sm:h-4.5 md:w-5 md:h-5 shrink-0" />, label: 'Admin Dashboard' },
+    { to: '/admin/bursary', icon: <FileSpreadsheet className="w-4 h-4 sm:w-4.5 sm:h-4.5 md:w-5 md:h-5 shrink-0" />, label: 'Bursary & Member Directory' },
     { to: '/admin/bursary/deductions', icon: <Edit3 className="w-4 h-4 sm:w-4.5 sm:h-4.5 md:w-5 md:h-5 shrink-0" />, label: 'Edit Deductions' },
-    { to: '/admin/loans', icon: <CreditCard className="w-4 h-4 sm:w-4.5 sm:h-4.5 md:w-5 md:h-5 shrink-0" />, label: 'Loan Approvals' },
-    { to: '/admin/stock', icon: <Package className="w-4 h-4 sm:w-4.5 sm:h-4.5 md:w-5 md:h-5 shrink-0" />, label: 'Stock Management' },
-    { to: '/admin/rbac', icon: <ShieldCheck className="w-4 h-4 sm:w-4.5 sm:h-4.5 md:w-5 md:h-5 shrink-0" />, label: 'RBAC Manager' },
-    { to: '/admin/support', icon: <LifeBuoy className="w-4 h-4 sm:w-4.5 sm:h-4.5 md:w-5 md:h-5 shrink-0" />, label: 'Tickets Helpdesk' },
-    { to: '/admin/audit', icon: <FileText className="w-4 h-4 sm:w-4.5 sm:h-4.5 md:w-5 md:h-5 shrink-0" />, label: 'Audit Logs' },
   ];
 
   return (
@@ -96,10 +90,9 @@ export default function AdminLayout({ children, role, icon }: AdminLayoutProps) 
 
       {/* Responsive Collapsible Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-[90] bg-white border-r border-slate-200 flex flex-col
+        fixed inset-y-0 left-0 bg-white border-r border-slate-200 flex flex-col
         transition-all duration-300 ease-in-out shrink-0
-        lg:sticky lg:top-0 lg:h-screen
-        ${isMobileOpen ? 'translate-x-0 w-72 shadow-2xl' : '-translate-x-full lg:translate-x-0'}
+        ${isMobileOpen ? 'translate-x-0 w-72 shadow-2xl z-[90]' : '-translate-x-full lg:translate-x-0 z-40'}
         ${isCollapsed ? 'lg:w-20' : 'lg:w-64'}
       `}>
         {/* Header Branding & Collapse Toggle */}
@@ -230,7 +223,7 @@ export default function AdminLayout({ children, role, icon }: AdminLayoutProps) 
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out ${isCollapsed ? 'lg:pl-20' : 'lg:pl-64'}`}>
         {/* Top Navbar */}
         <header className="sticky top-0 z-30 h-16 bg-white/90 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 lg:px-8 shadow-sm">
           <div className="flex items-center gap-3">

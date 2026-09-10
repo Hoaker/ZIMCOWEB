@@ -96,11 +96,11 @@ export default function Services() {
           </p>
         </div>
 
-        <div className="grid grid-cols-12 gap-5 sm:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
           {/* Thrift Savings */}
           <motion.div 
             whileHover={{ y: -5 }}
-            className="col-span-12 lg:col-span-4 bg-white p-6 sm:p-8 md:p-10 rounded-2xl sm:rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col"
+            className="bg-white p-6 sm:p-8 md:p-10 rounded-2xl sm:rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col"
           >
             <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 rounded-xl sm:rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-5 sm:mb-8">
               <PiggyBank className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8" />
@@ -125,7 +125,7 @@ export default function Services() {
           {/* Zero-Interest Loans - Featured */}
           <motion.div 
             whileHover={{ y: -5 }}
-            className="col-span-12 lg:col-span-4 bg-emerald-600 p-6 sm:p-8 md:p-10 rounded-2xl sm:rounded-[2rem] md:rounded-[2.5rem] text-white shadow-xl shadow-emerald-200 relative overflow-hidden lg:scale-105 z-10"
+            className="bg-emerald-600 p-6 sm:p-8 md:p-10 rounded-2xl sm:rounded-[2rem] md:rounded-[2.5rem] text-white shadow-xl shadow-emerald-200 relative overflow-hidden lg:scale-105 z-10 flex flex-col"
           >
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl" />
             <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 rounded-xl sm:rounded-2xl bg-white/20 flex items-center justify-center mb-5 sm:mb-8">
@@ -154,7 +154,7 @@ export default function Services() {
           {/* Investment & Trade */}
           <motion.div 
             whileHover={{ y: -5 }}
-            className="col-span-12 lg:col-span-4 bg-white p-6 sm:p-8 md:p-10 rounded-2xl sm:rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col"
+            className="md:col-span-2 lg:col-span-1 bg-white p-6 sm:p-8 md:p-10 rounded-2xl sm:rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col"
           >
             <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 rounded-xl sm:rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-5 sm:mb-8">
               <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8" />

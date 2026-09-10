@@ -407,7 +407,7 @@ export default function MemberHelpdesk() {
 
             <div className="space-y-1">
               <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Priority Level</label>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {(['low', 'medium', 'high', 'critical'] as const).map(p => (
                   <button
                     key={p}

@@ -47,6 +47,7 @@ interface MemberProfileProps {
   onNavigateToKYC?: () => void;
   onNavigateToTopUp?: () => void;
   onNavigateToWithdrawal?: () => void;
+  onNavigateToYearly?: () => void;
 }
 
 export default function MemberProfile({
@@ -55,7 +56,8 @@ export default function MemberProfile({
   onUpdateMemberData,
   onNavigateToKYC,
   onNavigateToTopUp,
-  onNavigateToWithdrawal
+  onNavigateToWithdrawal,
+  onNavigateToYearly
 }: MemberProfileProps) {
   const [activeTab, setActiveTab] = useState<'status' | 'contact' | 'activity'>('status');
   const [isEditingContact, setIsEditingContact] = useState(false);
@@ -65,26 +67,27 @@ export default function MemberProfile({
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [activityFilter, setActivityFilter] = useState<'all' | 'credit' | 'debit' | 'loan'>('all');
   const [activitySearchQuery, setActivitySearchQuery] = useState('');
+  const [selectedYearFilter, setSelectedYearFilter] = useState<string>('all');
   const [isDownloadingCert, setIsDownloadingCert] = useState(false);
 
   // Form State for Contact and Personal Information
   const [formData, setFormData] = useState({
     fullName: memberData?.fullName || '',
     email: memberData?.email || '',
-    phone: memberData?.phone || '+234 803 123 4567',
-    altPhone: memberData?.altPhone || '+234 812 987 6543',
-    address: memberData?.address || '14 Cooperative Way, University Campus, Ilorin, Kwara State',
-    city: memberData?.city || 'Ilorin',
-    state: memberData?.state || 'Kwara State',
-    department: memberData?.department || 'Finance & Accounts',
-    staffId: memberData?.staffId || 'STAFF-2024-889',
-    officeLocation: memberData?.officeLocation || 'Bursary Building, 2nd Floor, Room 204',
+    phone: memberData?.phone || '',
+    altPhone: memberData?.altPhone || '',
+    address: memberData?.address || '',
+    city: memberData?.city || '',
+    state: memberData?.state || '',
+    department: memberData?.department || '',
+    staffId: memberData?.staffId || '',
+    officeLocation: memberData?.officeLocation || '',
     // Next of Kin
-    nextOfKinName: memberData?.nextOfKinName || 'Mrs. Fatima Abdulhameed',
-    nextOfKinRelationship: memberData?.nextOfKinRelationship || 'Spouse',
-    nextOfKinPhone: memberData?.nextOfKinPhone || '+234 802 333 4455',
-    nextOfKinEmail: memberData?.nextOfKinEmail || 'fatima.abdul@example.com',
-    nextOfKinAddress: memberData?.nextOfKinAddress || '14 Cooperative Way, Ilorin, Kwara State'
+    nextOfKinName: memberData?.nextOfKinName || '',
+    nextOfKinRelationship: memberData?.nextOfKinRelationship || '',
+    nextOfKinPhone: memberData?.nextOfKinPhone || '',
+    nextOfKinEmail: memberData?.nextOfKinEmail || '',
+    nextOfKinAddress: memberData?.nextOfKinAddress || ''
   });
 
   const memberId = memberData?.id || localStorage.getItem('zimco_id') || 'ZIM-2026-001';
@@ -186,6 +189,19 @@ export default function MemberProfile({
     }
   };
 
+  // Available years from transactions
+  const availableYears = React.useMemo(() => {
+    const curYear = new Date().getFullYear();
+    const set = new Set<number>();
+    set.add(curYear);
+    set.add(curYear - 1);
+    transactions.forEach(t => {
+      const match = String(t.date || t.timestamp || '').match(/\b(20\d{2})\b/);
+      if (match) set.add(parseInt(match[1], 10));
+    });
+    return Array.from(set).sort((a, b) => b - a);
+  }, [transactions]);
+
   // Filtered transactions for Activity Summary
   const filteredTransactions = transactions.filter(tx => {
     const matchesFilter = 
@@ -194,13 +210,17 @@ export default function MemberProfile({
       activityFilter === 'debit' ? tx.type === 'debit' :
       activityFilter === 'loan' ? (tx.account?.toLowerCase().includes('loan') || tx.description?.toLowerCase().includes('loan')) : true;
 
+    const matchesYear = 
+      selectedYearFilter === 'all' ? true :
+      String(tx.date || tx.timestamp || '').includes(selectedYearFilter);
+
     const matchesSearch = activitySearchQuery.trim() === '' ? true :
       tx.description?.toLowerCase().includes(activitySearchQuery.toLowerCase()) ||
       tx.account?.toLowerCase().includes(activitySearchQuery.toLowerCase()) ||
       tx.amount?.toLowerCase().includes(activitySearchQuery.toLowerCase()) ||
       tx.date?.toLowerCase().includes(activitySearchQuery.toLowerCase());
 
-    return matchesFilter && matchesSearch;
+    return matchesFilter && matchesYear && matchesSearch;
   });
 
   const totalCredits = transactions
@@ -264,10 +284,12 @@ export default function MemberProfile({
                   </button>
                 </div>
 
-                <div className="flex items-center gap-1.5">
-                  <Briefcase size={14} className="text-emerald-600" />
-                  <span>{memberData?.department || formData.department}</span>
-                </div>
+                {(memberData?.department || formData.department) && (
+                  <div className="flex items-center gap-1.5">
+                    <Briefcase size={14} className="text-emerald-600" />
+                    <span>{memberData?.department || formData.department}</span>
+                  </div>
+                )}
 
                 <div className="flex items-center gap-1.5">
                   <Calendar size={14} className="text-slate-400" />
@@ -388,9 +410,6 @@ export default function MemberProfile({
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Membership Class</span>
                 <h4 className="font-bold text-slate-900 text-base mt-0.5">Class A Full Shareholder</h4>
               </div>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Full equity rights, unconstrained zero-interest borrowing rights & annual dividend shares.
-              </p>
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                 <span className="text-slate-400">Standing:</span>
                 <span className="font-bold text-emerald-700">Good Standing</span>
@@ -404,11 +423,8 @@ export default function MemberProfile({
               </div>
               <div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">KYC Compliance</span>
-                <h4 className="font-bold text-slate-900 text-base mt-0.5">Tier 2 Verified (NIN & Bio)</h4>
+                <h4 className="font-bold text-slate-900 text-base mt-0.5">Tier 2 Verified</h4>
               </div>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                National identity credentials and address proof validated by the compliance registry.
-              </p>
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                 <span className="text-slate-400">Registry ID:</span>
                 <span className="font-mono font-bold text-slate-800">NIN-2024-***901</span>
@@ -421,12 +437,9 @@ export default function MemberProfile({
                 <Award size={20} />
               </div>
               <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">AGM Voting Status</span>
-                <h4 className="font-bold text-slate-900 text-base mt-0.5">Fully Qualified Voter</h4>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">AGM Voting</span>
+                <h4 className="font-bold text-slate-900 text-base mt-0.5">Qualified Voter</h4>
               </div>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Qualified to vote for executive committee elections and participate in general assembly resolutions.
-              </p>
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                 <span className="text-slate-400">Next AGM:</span>
                 <span className="font-bold text-amber-800">November 2026</span>
@@ -439,16 +452,13 @@ export default function MemberProfile({
                 <CreditCard size={20} />
               </div>
               <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Borrowing Limit (200% OS)</span>
-                <h4 className="font-bold text-slate-900 text-base mt-0.5">₦{maxBorrowingPower.toLocaleString()} Available</h4>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Borrowing Limit</span>
+                <h4 className="font-bold text-slate-900 text-base mt-0.5">₦{maxBorrowingPower.toLocaleString()}</h4>
               </div>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Zero-interest credit entitlement backed by ₦{os.toLocaleString()} Ordinary Savings collateral.
-              </p>
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                 <span className="text-slate-400">Active Debt:</span>
                 <span className={`font-bold ${outstandingLoans > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
-                  {outstandingLoans > 0 ? `₦${outstandingLoans.toLocaleString()}` : 'Zero Debt (₦0)'}
+                  {outstandingLoans > 0 ? `₦${outstandingLoans.toLocaleString()}` : '₦0'}
                 </span>
               </div>
             </div>
@@ -464,50 +474,33 @@ export default function MemberProfile({
               </div>
 
               <div className="space-y-4">
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900 text-sm">Minimum Share Capital Obligation</span>
-                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full">100% Satisfied</span>
-                    </div>
-                    <p className="text-xs text-slate-500 leading-relaxed">
-                      You have met the mandatory ₦500,000 cooperative share capital requirement to unlock full voting power and profit-sharing dividend distributions.
-                    </p>
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-900 text-sm">Minimum Share Capital</span>
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full">100% Satisfied</span>
                   </div>
                   <div className="text-right font-mono shrink-0">
-                    <span className="text-xs text-slate-400 block">Invested Capital</span>
                     <span className="text-base font-black text-slate-900">₦{ia.toLocaleString()}</span>
                   </div>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900 text-sm">Surplus Dividend Participation</span>
-                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full">Active Tier</span>
-                    </div>
-                    <p className="text-xs text-slate-500 leading-relaxed">
-                      Qualified to receive semi-annual dividend yields calculated pro-rata on your cumulative Ordinary Savings and Investment balance.
-                    </p>
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-900 text-sm">Dividend Participation</span>
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full">Active Tier</span>
                   </div>
                   <div className="text-right font-mono shrink-0">
-                    <span className="text-xs text-slate-400 block">Est. 2026 Dividend</span>
+                    <span className="text-xs text-slate-400 block">Est. Dividend</span>
                     <span className="text-base font-black text-emerald-700">₦{(totalPortfolio * 0.085).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                   </div>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900 text-sm">Guarantor & Endorsement Authority</span>
-                      <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-bold rounded-full">Eligible</span>
-                    </div>
-                    <p className="text-xs text-slate-500 leading-relaxed">
-                      As an active member with over 12 months verified history, you are authorized to act as a guarantor for fellow members' zero-interest credit requests.
-                    </p>
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-900 text-sm">Guarantor Eligibility</span>
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-bold rounded-full">Eligible</span>
                   </div>
                   <div className="text-right shrink-0 font-mono">
-                    <span className="text-xs text-slate-400 block">Endorsement Power</span>
                     <span className="text-base font-black text-slate-900">Up to 2 Members</span>
                   </div>
                 </div>
@@ -1001,13 +994,60 @@ export default function MemberProfile({
 
           {/* Activity Log & Transaction Stream Table */}
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-sm space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
               <div>
-                <h3 className="font-headline text-xl font-bold text-slate-900">Recent Account Activity Stream</h3>
-                <p className="text-xs text-slate-400">Complete chronological audit trail of all transactions and contributions</p>
+                <h3 className="font-headline text-xl font-bold text-slate-900">Member Transaction Ledger & Records</h3>
+                <p className="text-xs text-slate-400">Complete chronological audit trail with multi-year filter support</p>
               </div>
 
-              {/* Search & Filter Bar */}
+              {/* Action: Open Dedicated Yearly Record View */}
+              {onNavigateToYearly && (
+                <button
+                  type="button"
+                  onClick={onNavigateToYearly}
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition flex items-center gap-1.5 self-start lg:self-auto cursor-pointer"
+                >
+                  <FileText size={14} className="text-emerald-700" />
+                  <span>Open Full Yearly Statement</span>
+                  <ChevronRight size={14} />
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {/* Year Selector Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                <span className="text-xs font-semibold text-slate-500 mr-1 flex items-center gap-1">
+                  <Calendar size={13} className="text-emerald-600" /> Year:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedYearFilter('all')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    selectedYearFilter === 'all'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  All Years
+                </button>
+                {availableYears.map(yr => (
+                  <button
+                    key={yr}
+                    type="button"
+                    onClick={() => setSelectedYearFilter(String(yr))}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      selectedYearFilter === String(yr)
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {yr}
+                  </button>
+                ))}
+              </div>
+
+              {/* Search & Type Filter Bar */}
               <div className="flex flex-wrap items-center gap-2.5">
                 <div className="relative">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -1016,7 +1056,7 @@ export default function MemberProfile({
                     placeholder="Search activity..."
                     value={activitySearchQuery}
                     onChange={(e) => setActivitySearchQuery(e.target.value)}
-                    className="bg-slate-50 border border-slate-200 rounded-full py-1.5 pl-8 pr-3 text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none w-44 sm:w-56"
+                    className="bg-slate-50 border border-slate-200 rounded-full py-1.5 pl-8 pr-3 text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none w-44 sm:w-52"
                   />
                 </div>
 

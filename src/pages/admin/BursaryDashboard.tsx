@@ -46,7 +46,10 @@ import {
   Scale,
   AlertOctagon,
   Users,
-  UserCheck
+  UserCheck,
+  Wand2,
+  Loader2,
+  CheckCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
@@ -58,8 +61,13 @@ import {
   exportNormalizedSpreadsheet, 
   generateSampleRawSheet, 
   extractCycleMonthYear,
+  extractFirstName,
+  extractSurname,
+  matchMemberForImport,
+  deriveDefaultPassword,
   ParsedRawSheet, 
-  NormalizedDeductionRecord 
+  NormalizedDeductionRecord,
+  DataQualityFlag
 } from '../../lib/deductionNormalizer';
 import DynamicNormalizationWorkbench from '../../components/DynamicNormalizationWorkbench';
 import SampleExcelTestModal from '../../components/SampleExcelTestModal';
@@ -67,6 +75,8 @@ import NewMembersCredentialModal, { NewMemberCredential } from '../../components
 import DatabaseReconciliationCheck from '../../components/DatabaseReconciliationCheck';
 import BursaryNextMonthDispatch from '../../components/BursaryNextMonthDispatch';
 import AdminMemberDirectory from '../../components/AdminMemberDirectory';
+import BursaryMemberRoster from '../../components/bursary/BursaryMemberRoster';
+import PayrollImportStepper from '../../components/bursary/PayrollImportStepper';
 import { SAMPLE_TEST_FILES } from '../../lib/sampleSpreadsheets';
 
 interface DeductionRecord {
@@ -91,6 +101,7 @@ interface DeductionRecord {
     loanReimbursement: number;
     muslimCommunity?: number;
   };
+  dataQualityFlags?: DataQualityFlag[];
 }
 
 interface ReconciliationItem {
@@ -118,10 +129,14 @@ export default function BursaryDashboard() {
     localStorage.setItem('zimco_bursary_sidebar_collapsed', isSidebarCollapsed ? 'true' : 'false');
   }, [isSidebarCollapsed]);
 
+  // Stepper state (1: Upload & Map, 2: Review & Verify, 3: Confirm & Push)
+  const [payrollStep, setPayrollStep] = useState<1 | 2 | 3>(1);
+
   // Dynamic Ingestion & Normalization states
   const [importWorkflowStage, setImportWorkflowStage] = useState<'review' | 'normalization'>('review');
   const [parsedRawSheet, setParsedRawSheet] = useState<ParsedRawSheet | null>(null);
   const [showSampleModal, setShowSampleModal] = useState(false);
+  const [importMode, setImportMode] = useState<'live' | 'historical'>('live');
 
   // Firestore integration states
   const [firestoreMembers, setFirestoreMembers] = useState<any[]>([]);
@@ -153,6 +168,7 @@ export default function BursaryDashboard() {
   // Newly Provisioned Members credentials state & follow-up interface
   const [newlyProvisionedMembers, setNewlyProvisionedMembers] = useState<NewMemberCredential[]>([]);
   const [showNewMembersModal, setShowNewMembersModal] = useState(false);
+  const [showErrorResolutionModal, setShowErrorResolutionModal] = useState(false);
 
   // Reconciliation state
   const [reconciliationList, setReconciliationList] = useState<ReconciliationItem[]>([]);
@@ -175,19 +191,52 @@ export default function BursaryDashboard() {
       setLoadingFirestore(true);
       try {
         const querySnapshot = await getDocs(collection(db, 'users'));
-        const membersList: any[] = [];
+        const memberMap = new Map<string, any>();
+        const seenNames = new Map<string, string>(); // normalized cooperator name -> canonical key
+        const seenEmails = new Map<string, string>(); // normalized email -> canonical key
+
         querySnapshot.forEach((docSnap) => {
           const data = docSnap.data();
-          membersList.push({
+          if (data.isAlias) return; // Skip explicit alias docs
+          
+          const rawId = data.id || data.memberId || docSnap.id;
+          const canonicalKey = String(rawId).trim().toUpperCase();
+          if (!canonicalKey) return;
+
+          // Check if docId is pure alphabetic uppercase string (e.g., 'ABAS' or 'ADMIN' without ZIM prefix)
+          const isDocIdPureAlpha = /^[A-Za-z]+$/.test(docSnap.id) && !docSnap.id.startsWith('ZIM-') && !docSnap.id.startsWith('STF-');
+
+          const normName = (data.fullName || data.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const normEmail = (data.email || '').toLowerCase().trim();
+
+          // If this cooperator's name or email has already been added via a canonical document, skip alias
+          if (normName && seenNames.has(normName) && isDocIdPureAlpha) {
+            return;
+          }
+          if (normEmail && seenEmails.has(normEmail) && isDocIdPureAlpha) {
+            return;
+          }
+
+          const isExactDocMatch = docSnap.id.toUpperCase() === canonicalKey;
+          const memberRecord = {
             ...data,
             docId: docSnap.id,
             firestoreDocId: docSnap.id,
             id: data.id || docSnap.id,
             uid: data.uid || docSnap.id,
             memberId: data.memberId || data.id || docSnap.id,
-          });
+          };
+
+          if (!memberMap.has(canonicalKey)) {
+            memberMap.set(canonicalKey, memberRecord);
+            if (normName) seenNames.set(normName, canonicalKey);
+            if (normEmail) seenEmails.set(normEmail, canonicalKey);
+          } else if (isExactDocMatch || String(data.id || '').startsWith('ZIM-')) {
+            // Canonical doc overwrites alias docs that may have been parsed earlier
+            memberMap.set(canonicalKey, memberRecord);
+          }
         });
-        setFirestoreMembers(membersList);
+        setFirestoreMembers(Array.from(memberMap.values()));
         // Clean initial state: no dummy deduction records until user imports workbook
         setImportedRecords([]);
         setIsImported(false);
@@ -310,6 +359,25 @@ export default function BursaryDashboard() {
     }
   };
 
+  // Switch sheet in multi-sheet workbook
+  const handleSwitchSheet = (targetSheetName: string) => {
+    if (!parsedRawSheet?.rawFileBuffer) {
+      showToast('Original workbook buffer not available for sheet switching.', 'warning');
+      return;
+    }
+    try {
+      setIsParsing(true);
+      const parsed = parseSpreadsheetBuffer(parsedRawSheet.rawFileBuffer, parsedRawSheet.fileName, targetSheetName);
+      setParsedRawSheet(parsed);
+      setImportWorkflowStage('normalization');
+      setIsParsing(false);
+      showToast(`Switched to sheet "${targetSheetName}" with ${parsed.rawHeaders.length} columns.`, 'success');
+    } catch (error: any) {
+      setIsParsing(false);
+      showToast(`Error switching sheet: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
+  };
+
   // Helper to extract surname in lowercase from cooperator full name
   const extractSurname = (fullName: string): string => {
     if (!fullName) return 'member';
@@ -330,27 +398,22 @@ export default function BursaryDashboard() {
     const newItems: NewMemberCredential[] = [];
 
     records.forEach((record) => {
-      const recordNameClean = (record.name || '').trim().toLowerCase();
-      const recordIdClean = (record.id || '').trim().toUpperCase();
+      const matchResult = matchMemberForImport(record.id, record.name, existingMembersList);
 
-      const exists = existingMembersList.some(u => {
-        const uDocId = (u.docId || u.firestoreDocId || '').toUpperCase();
-        const uId = (u.id || u.memberId || u.uid || '').toUpperCase();
-        const uUid = (u.uid || '').toUpperCase();
-        const uName = (u.fullName || u.name || '').toLowerCase();
-        return (recordIdClean && (uDocId === recordIdClean || uId === recordIdClean || uUid === recordIdClean)) || (recordNameClean && uName === recordNameClean);
-      });
-
-      if (!exists) {
+      if (matchResult.matchType === 'unmatched') {
         const surname = extractSurname(record.name);
+        const firstName = extractFirstName(record.name);
         const assignedId = record.id && record.id.startsWith('ZIM-') 
           ? record.id 
           : `ZIM-2026-${String(existingMembersList.length + newItems.length + 1).padStart(3, '0')}`;
+        const defaultPassword = deriveDefaultPassword(assignedId);
         
         newItems.push({
           id: assignedId,
           name: record.name,
+          defaultPassword: defaultPassword,
           surname: surname,
+          firstName: firstName,
           email: `member_${assignedId.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}@zimco.org`,
           initialDeduction: record.total || 0,
           ordinarySavings: record.ordinarySavings || 0,
@@ -369,30 +432,29 @@ export default function BursaryDashboard() {
   };
 
   // Called when Dynamic Normalization Workbench successfully sanitizes and normalizes the spreadsheet
-  const handleNormalizationComplete = (normalizedList: NormalizedDeductionRecord[]) => {
+  const handleNormalizationComplete = (normalizedList: NormalizedDeductionRecord[], specifiedMonth?: string) => {
+    // Auto-sync deduction cycle month if specified by bursary or from date column
+    const cycleToUse = specifiedMonth || (normalizedList.length > 0 && normalizedList[0].date ? extractCycleMonthYear(normalizedList[0].date) : activeMonth);
+    if (cycleToUse) {
+      setActiveMonth(cycleToUse);
+    }
+
     const auditedRecords: DeductionRecord[] = normalizedList.map(item => {
       const baseRecord: DeductionRecord = {
         id: item.id,
         name: item.name,
-        date: item.date,
+        date: specifiedMonth || item.date || cycleToUse,
         ordinarySavings: item.ordinarySavings,
         specialSavings: item.specialSavings,
         investment: item.investment,
         commodityPurchase: item.commodityPurchase,
         loanReimbursement: item.loanReimbursement,
         muslimCommunity: item.muslimCommunity,
-        total: item.total
+        total: item.total,
+        dataQualityFlags: item.dataQualityFlags
       };
       return reAuditRecord(baseRecord);
     });
-
-    // Auto-sync deduction cycle month if date column was specified
-    if (normalizedList.length > 0 && normalizedList[0].date) {
-      const cyclePeriod = extractCycleMonthYear(normalizedList[0].date);
-      if (cyclePeriod) {
-        setActiveMonth(cyclePeriod);
-      }
-    }
 
     setImportedRecords(auditedRecords);
     setIsImported(true);
@@ -418,46 +480,74 @@ export default function BursaryDashboard() {
 
   // Diagnostic rule evaluation code
   const reAuditRecord = (row: DeductionRecord): DeductionRecord => {
-    const sum = Number(row.ordinarySavings) + Number(row.specialSavings) + Number(row.investment) + Number(row.commodityPurchase) + Number(row.loanReimbursement) + Number(row.muslimCommunity || 0);
+    const sum = Number(row.ordinarySavings || 0) + Number(row.specialSavings || 0) + Number(row.investment || 0) + Number(row.commodityPurchase || 0) + Number(row.loanReimbursement || 0) + Number(row.muslimCommunity || 0);
+    const declaredTotal = Number(row.total !== undefined && row.total !== null ? row.total : sum);
     
-    // Check ordinary savings ceiling limit
-    if (Number(row.ordinarySavings) > ordinarySavingsCeiling) {
+    // Check total match with tolerance for floating point rounding
+    if (declaredTotal > 0 && Math.abs(sum - declaredTotal) > 1) {
       return {
         ...row,
+        total: declaredTotal,
         status: 'error',
-        message: `LIMIT MISMATCH: Ordinary Savings ₦${Number(row.ordinarySavings).toLocaleString()} exceeds ceiling threshold limits (₦${ordinarySavingsCeiling.toLocaleString()}).`
+        message: `MATH MISMATCH: Row itemized allocations sum is ₦${sum.toLocaleString()} but spreadsheet total column says ₦${declaredTotal.toLocaleString()}.`
       };
     }
 
-    // Check special savings ceiling limit
-    if (Number(row.specialSavings) > specialSavingsCeiling) {
+    // Check ordinary savings ceiling limit (Advisory warning, not blocking error)
+    if (Number(row.ordinarySavings || 0) > ordinarySavingsCeiling) {
       return {
         ...row,
-        status: 'error',
-        message: `LIMIT MISMATCH: Special Savings ₦${Number(row.specialSavings).toLocaleString()} exceeds ceiling threshold limits (₦${specialSavingsCeiling.toLocaleString()}).`
+        total: declaredTotal > 0 ? declaredTotal : sum,
+        status: 'warning',
+        message: `THRESHOLD NOTICE: Ordinary Savings ₦${Number(row.ordinarySavings).toLocaleString()} exceeds standard ceiling (₦${ordinarySavingsCeiling.toLocaleString()}).`
       };
     }
 
-    // Check total match
-    if (sum !== Number(row.total)) {
+    // Check special savings ceiling limit (Advisory warning, not blocking error)
+    if (Number(row.specialSavings || 0) > specialSavingsCeiling) {
       return {
         ...row,
-        status: 'error',
-        message: `MATH ERROR: Row itemized allocations sum is ₦${sum.toLocaleString()} but spreadsheet total label says ₦${Number(row.total).toLocaleString()}.`
+        total: declaredTotal > 0 ? declaredTotal : sum,
+        status: 'warning',
+        message: `THRESHOLD NOTICE: Special Savings ₦${Number(row.specialSavings).toLocaleString()} exceeds standard ceiling (₦${specialSavingsCeiling.toLocaleString()}).`
       };
     }
 
     // High total caution warning
-    if (sum > 200000) {
+    if (sum > 250000) {
       return {
         ...row,
+        total: declaredTotal > 0 ? declaredTotal : sum,
         status: 'warning',
-        message: 'WARN: High-value deduction requires supplemental approval certificate.'
+        message: 'AUDIT NOTICE: High-value deduction requires standard bursary reconciliation review.'
       };
+    }
+
+    // Check data-quality flags
+    if (row.dataQualityFlags && row.dataQualityFlags.length > 0) {
+      const errorFlag = row.dataQualityFlags.find(f => f.severity === 'error');
+      if (errorFlag) {
+        return {
+          ...row,
+          total: declaredTotal > 0 ? declaredTotal : sum,
+          status: 'error',
+          message: errorFlag.message
+        };
+      }
+      const warnFlag = row.dataQualityFlags.find(f => f.severity === 'warning');
+      if (warnFlag) {
+        return {
+          ...row,
+          total: declaredTotal > 0 ? declaredTotal : sum,
+          status: 'warning',
+          message: warnFlag.message
+        };
+      }
     }
 
     return {
       ...row,
+      total: declaredTotal > 0 ? declaredTotal : sum,
       status: 'valid',
       message: 'All fields cleared and matched against register.'
     };
@@ -544,12 +634,181 @@ export default function BursaryDashboard() {
     }
   };
 
-  // Push finalized balances to Member Dashboards (Firestore integration!)
-  const handlePushToMembers = async () => {
-    const errors = importedRecords.filter(r => r.status === 'error');
-    if (errors.length > 0) {
-      showToast('Cannot push file to member dashboards while critical errors exist. Please resolve them first!', 'error');
+  // 1-Click Auto-Balance all mathematical mismatches
+  const handleAutoBalanceAllMismatches = () => {
+    if (importedRecords.length === 0) {
+      showToast('No deduction workbook loaded to balance.', 'warning');
       return;
+    }
+
+    const balanced = importedRecords.map(r => {
+      const sum = Number(r.ordinarySavings || 0) + Number(r.specialSavings || 0) + Number(r.investment || 0) + Number(r.commodityPurchase || 0) + Number(r.loanReimbursement || 0) + Number(r.muslimCommunity || 0);
+      return reAuditRecord({
+        ...r,
+        total: sum,
+        isModified: true
+      });
+    });
+
+    setImportedRecords(balanced);
+    setModifiedRecords(balanced.filter(r => r.isModified));
+    setShowErrorResolutionModal(false);
+    showToast(`Successfully auto-balanced ${balanced.length} deduction records to match exact itemized splits!`, 'success');
+  };
+
+  // Clear or Purge specific cycle records (e.g., January 2026) from active sheet and database
+  const handleClearCycleRecords = async (targetCycleName: string = activeMonth) => {
+    const isJan = targetCycleName.toLowerCase().includes('jan');
+    const confirmMessage = `Are you sure you want to clear and purge all ${targetCycleName} deduction records from the active workbook and database ledgers?`;
+
+    if (!window.confirm(confirmMessage)) return;
+
+    // 1. Clear in-memory workbook state
+    setImportedRecords([]);
+    setIsImported(false);
+    setModifiedRecords([]);
+    setParsedRawSheet(null);
+    setReconciliationList([]);
+
+    // 2. Clear local storage records
+    try {
+      const reg = JSON.parse(localStorage.getItem('zimco_pushed_deductions_registry') || '[]');
+      const filtered = reg.filter((item: any) => {
+        const m = String(item.month || item.cycle || '').toLowerCase();
+        return isJan ? !m.includes('jan') : m !== targetCycleName.toLowerCase();
+      });
+      localStorage.setItem('zimco_pushed_deductions_registry', JSON.stringify(filtered));
+      localStorage.removeItem('zimco_last_deduction_sync');
+      localStorage.removeItem('zimco_deduction_records');
+      window.dispatchEvent(new StorageEvent('storage', { key: 'zimco_pushed_deductions_registry' }));
+    } catch (e) {
+      console.warn('Storage cleanup notice:', e);
+    }
+
+    // 3. Purge matching cycle records in Firestore users
+    setLoadingFirestore(true);
+    try {
+      const usersSnap = await getDocs(collection(db, 'users'));
+      let cleaned = 0;
+      const batchWriter = new SafeBatchWriter();
+
+      for (const uDoc of usersSnap.docs) {
+        const data = uDoc.data();
+        let needsUpdate = false;
+        const updates: Record<string, any> = {};
+
+        if (Array.isArray(data.monthlySavingsRecords) && data.monthlySavingsRecords.length > 0) {
+          const origLen = data.monthlySavingsRecords.length;
+          const filtered = data.monthlySavingsRecords.filter((rec: any) => {
+            const m = String(rec.month || rec.cycle || '').toLowerCase();
+            return isJan ? !m.includes('jan') : m !== targetCycleName.toLowerCase();
+          });
+          if (filtered.length !== origLen) {
+            updates.monthlySavingsRecords = filtered;
+            needsUpdate = true;
+          }
+        }
+
+        if (data.lastDeductionBreakdown) {
+          const cycleStr = String(data.lastDeductionBreakdown.cycle || '').toLowerCase();
+          if (isJan ? cycleStr.includes('jan') : cycleStr === targetCycleName.toLowerCase()) {
+            updates.lastDeductionBreakdown = null;
+            updates.lastDeductionAmount = 0;
+            needsUpdate = true;
+          }
+        }
+
+        if (needsUpdate) {
+          await batchWriter.set(doc(db, 'users', uDoc.id), updates, { merge: true });
+          cleaned++;
+        }
+      }
+
+      await batchWriter.commit();
+      showToast(`Successfully cleared and purged all ${targetCycleName} records! (${cleaned} member ledgers updated)`, 'success');
+    } catch (err: any) {
+      console.error('Error purging cycle records:', err);
+      showToast('Cleared active workbook records. Note: ' + (err.message || 'database sync notice'), 'warning');
+    } finally {
+      setLoadingFirestore(false);
+    }
+  };
+
+  // Safe Batch Writer helper class to avoid Firebase 500-op limit
+  class SafeBatchWriter {
+    private currentBatch = writeBatch(db);
+    private count = 0;
+    private totalCommitted = 0;
+
+    async set(ref: any, data: any, options?: any) {
+      if (options) {
+        this.currentBatch.set(ref, data, options);
+      } else {
+        this.currentBatch.set(ref, data);
+      }
+      this.count++;
+      if (this.count >= 250) {
+        await this.currentBatch.commit();
+        this.totalCommitted += this.count;
+        this.currentBatch = writeBatch(db);
+        this.count = 0;
+      }
+    }
+
+    async commit() {
+      if (this.count > 0) {
+        await this.currentBatch.commit();
+        this.totalCommitted += this.count;
+        this.count = 0;
+      }
+    }
+
+    getTotalCommitted() {
+      return this.totalCommitted;
+    }
+  }
+
+  // Push finalized balances to Member Dashboards (Firestore integration!)
+  const handlePushToMembers = async (forceAutoFix: boolean = false, validOnly: boolean = false) => {
+    if (pushStatus === 'pushing') return;
+
+    if (importedRecords.length === 0) {
+      showToast('No deduction records loaded yet. Please select an Excel/CSV file or test workbook.', 'warning');
+      setActiveTab('import');
+      setImportWorkflowStage('upload');
+      return;
+    }
+
+    let recordsToProcess = [...importedRecords];
+    const errors = recordsToProcess.filter(r => r.status === 'error');
+
+    // If unresolved errors exist and neither auto-fix nor valid-only was chosen, prompt resolution modal
+    if (errors.length > 0 && !forceAutoFix && !validOnly) {
+      setShowErrorResolutionModal(true);
+      return;
+    }
+
+    setShowErrorResolutionModal(false);
+
+    if (forceAutoFix) {
+      recordsToProcess = recordsToProcess.map(r => {
+        const sum = Number(r.ordinarySavings || 0) + Number(r.specialSavings || 0) + Number(r.investment || 0) + Number(r.commodityPurchase || 0) + Number(r.loanReimbursement || 0) + Number(r.muslimCommunity || 0);
+        return {
+          ...r,
+          total: sum,
+          status: 'valid' as const,
+          message: 'Auto-balanced declared total with itemized splits.'
+        };
+      });
+      setImportedRecords(recordsToProcess);
+      setModifiedRecords(recordsToProcess.filter(r => r.isModified));
+      showToast(`Auto-balanced ${errors.length} deduction total records to match itemized splits!`, 'success');
+    } else if (validOnly) {
+      recordsToProcess = recordsToProcess.filter(r => r.status !== 'error');
+      if (recordsToProcess.length === 0) {
+        showToast('No valid records available to push. Please auto-balance or correct rows first.', 'error');
+        return;
+      }
     }
 
     setPushStatus('pushing');
@@ -567,31 +826,19 @@ export default function BursaryDashboard() {
         });
       }, 300);
 
-      // Perform updates in database if available
-      const batch = writeBatch(db);
+      const batchWriter = new SafeBatchWriter();
       let matchedCount = 0;
       let newMembersCreatedCount = 0;
       const loggedInMemberId = localStorage.getItem('zimco_id');
       const newlyCreatedList: NewMemberCredential[] = [];
       const updatedFirestoreMembers = [...firestoreMembers];
-
       const pushedRegistry: any[] = [];
 
-      for (let i = 0; i < importedRecords.length; i++) {
-        const record = importedRecords[i];
-        // Find user by staff ID, Firestore doc ID, or matching email/name
-        const dbUser = firestoreMembers.find(u => {
-          const uDocId = (u.docId || u.firestoreDocId || '').toUpperCase();
-          const uId = (u.id || u.memberId || '').toUpperCase();
-          const uUid = (u.uid || '').toUpperCase();
-          const uName = (u.fullName || u.name || '').toLowerCase();
-          const rId = (record.id || '').toUpperCase();
-          const rName = (record.name || '').toLowerCase();
-          const uSurname = extractSurname(uName);
-          const rSurname = extractSurname(rName);
-          const surnameMatch = (rSurname && uSurname && (rSurname === uSurname || (rSurname === 'abas' && uSurname === 'abbas') || (rSurname === 'abbas' && uSurname === 'abas')));
-          return (rId && (uDocId === rId || uId === rId || uUid === rId)) || (rName && (uName === rName || uName.includes(rName) || rName.includes(uName))) || surnameMatch;
-        });
+      for (let i = 0; i < recordsToProcess.length; i++) {
+        const record = recordsToProcess[i];
+        // Find user accurately with strict ID or exact full name without surname collisions
+        const matchResult = matchMemberForImport(record.id, record.name, firestoreMembers);
+        const dbUser = matchResult.member;
         
         const currentDateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
         const currentIsoStr = new Date().toISOString();
@@ -630,6 +877,52 @@ export default function BursaryDashboard() {
           const newMuslimCommunity = currentMuslimCommunity + (record.muslimCommunity || 0);
           const newLoans = Math.max(0, currentLoans - (record.loanReimbursement || 0));
 
+          // Manage monthly savings passbook entries in chronological ascending order
+          const existingMonthlyRecords = Array.isArray(dbUser.monthlySavingsRecords) ? [...dbUser.monthlySavingsRecords] : [];
+          const monthIdx = existingMonthlyRecords.findIndex((mItem: any) => mItem.month === activeMonth || mItem.cycle === activeMonth);
+          const monthlyPassbookEntry = {
+            month: activeMonth,
+            cycle: activeMonth,
+            date: record.date || currentDateStr,
+            ordinarySavings: record.ordinarySavings || 0,
+            specialSavings: record.specialSavings || 0,
+            investment: record.investment || 0,
+            commodityPurchase: record.commodityPurchase || 0,
+            muslimCommunity: record.muslimCommunity || 0,
+            loanReimbursement: record.loanReimbursement || 0,
+            total: record.total || 0,
+            status: 'verified',
+            createdAt: currentIsoStr
+          };
+
+          if (monthIdx >= 0) {
+            existingMonthlyRecords[monthIdx] = monthlyPassbookEntry;
+          } else {
+            existingMonthlyRecords.push(monthlyPassbookEntry);
+          }
+
+          // Sort in ascending calendar sequence
+          const MONTH_ORDER: Record<string, number> = {
+            'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
+            'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12
+          };
+          existingMonthlyRecords.sort((a: any, b: any) => {
+            const getMonthScore = (val: string) => {
+              const lower = String(val || '').toLowerCase();
+              const yearMatch = lower.match(/20\d\d/);
+              const year = yearMatch ? parseInt(yearMatch[0], 10) : 2026;
+              let monthScore = 99;
+              for (const [mName, mNum] of Object.entries(MONTH_ORDER)) {
+                if (lower.includes(mName)) {
+                  monthScore = mNum;
+                  break;
+                }
+              }
+              return year * 100 + monthScore;
+            };
+            return getMonthScore(a.month) - getMonthScore(b.month);
+          });
+
           const userBalancePayload = {
             ordinarySavings: newOrdinary,
             specialSavings: newSpecial,
@@ -640,28 +933,24 @@ export default function BursaryDashboard() {
             outstandingLoans: newLoans,
             lastDeductionAmount: record.total,
             lastDeductionDate: currentIsoStr,
-            lastDeductionBreakdown: deductionBreakdown
+            lastDeductionBreakdown: deductionBreakdown,
+            monthlySavingsRecords: existingMonthlyRecords
           };
 
           // Use setDoc with { merge: true } on batch to prevent "No document to update" error
-          batch.set(userRef, userBalancePayload, { merge: true });
+          await batchWriter.set(userRef, userBalancePayload, { merge: true });
 
           // Also synchronize Auth UID document if it differs from the primary docId
           if (dbUser.uid && dbUser.uid !== targetDocId) {
             const authUserRef = doc(db, 'users', dbUser.uid);
-            batch.set(authUserRef, userBalancePayload, { merge: true });
+            await batchWriter.set(authUserRef, userBalancePayload, { merge: true });
           }
 
-          // Alias document by surname for instant direct doc lookup
           const existingSurname = extractSurname(dbUser.fullName || dbUser.name || record.name);
-          if (existingSurname) {
-            const aliasSurnameRef = doc(db, 'users', existingSurname.toUpperCase());
-            batch.set(aliasSurnameRef, userBalancePayload, { merge: true });
-          }
 
           // 1. Overall summary transaction entry
           const summaryTxRef = doc(collection(db, 'users', targetDocId, 'transactions'));
-          batch.set(summaryTxRef, {
+          await batchWriter.set(summaryTxRef, {
             date: currentDateStr,
             description: `Monthly Payroll Deduction - ${activeMonth}`,
             amount: `₦${Number(record.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -674,7 +963,7 @@ export default function BursaryDashboard() {
           // 2. Itemized transaction splits if amounts are > 0
           if (record.ordinarySavings > 0) {
             const osTxRef = doc(collection(db, 'users', targetDocId, 'transactions'));
-            batch.set(osTxRef, {
+            await batchWriter.set(osTxRef, {
               date: currentDateStr,
               description: `Ordinary Savings Allocation (${activeMonth})`,
               amount: `₦${Number(record.ordinarySavings).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -687,7 +976,7 @@ export default function BursaryDashboard() {
 
           if (record.specialSavings > 0) {
             const ssTxRef = doc(collection(db, 'users', targetDocId, 'transactions'));
-            batch.set(ssTxRef, {
+            await batchWriter.set(ssTxRef, {
               date: currentDateStr,
               description: `Special Savings Allocation (${activeMonth})`,
               amount: `₦${Number(record.specialSavings).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -700,7 +989,7 @@ export default function BursaryDashboard() {
 
           if (record.investment > 0) {
             const iaTxRef = doc(collection(db, 'users', targetDocId, 'transactions'));
-            batch.set(iaTxRef, {
+            await batchWriter.set(iaTxRef, {
               date: currentDateStr,
               description: `Investment Capital Allocation (${activeMonth})`,
               amount: `₦${Number(record.investment).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -713,7 +1002,7 @@ export default function BursaryDashboard() {
 
           if (record.loanReimbursement > 0) {
             const loanTxRef = doc(collection(db, 'users', targetDocId, 'transactions'));
-            batch.set(loanTxRef, {
+            await batchWriter.set(loanTxRef, {
               date: currentDateStr,
               description: `Loan Repayment Recovery (${activeMonth})`,
               amount: `₦${Number(record.loanReimbursement).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -726,7 +1015,7 @@ export default function BursaryDashboard() {
 
           if (record.commodityPurchase > 0) {
             const cpTxRef = doc(collection(db, 'users', targetDocId, 'transactions'));
-            batch.set(cpTxRef, {
+            await batchWriter.set(cpTxRef, {
               date: currentDateStr,
               description: `Commodity Purchase Deduction (${activeMonth})`,
               amount: `₦${Number(record.commodityPurchase).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -739,7 +1028,7 @@ export default function BursaryDashboard() {
 
           if (record.muslimCommunity && record.muslimCommunity > 0) {
             const mcaTxRef = doc(collection(db, 'users', targetDocId, 'transactions'));
-            batch.set(mcaTxRef, {
+            await batchWriter.set(mcaTxRef, {
               date: currentDateStr,
               description: `Muslim Community Allocation (${activeMonth})`,
               amount: `₦${Number(record.muslimCommunity).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -778,14 +1067,31 @@ export default function BursaryDashboard() {
           // PROVISION NEW MEMBER RECORD IN FIRESTORE DIRECTLY
           newMembersCreatedCount++;
           const surname = extractSurname(record.name);
+          const firstName = extractFirstName(record.name);
           const assignedId = record.id && String(record.id).startsWith('ZIM-') 
             ? String(record.id) 
             : `ZIM-2026-${String(firestoreMembers.length + newMembersCreatedCount).padStart(3, '0')}`;
+          const defaultPassword = deriveDefaultPassword(assignedId);
           
           const rawIdClean = assignedId.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
           const targetEmail = `member_${rawIdClean}@zimco.org`;
           const newUid = assignedId; // Primary key for member doc
           const newUserRef = doc(db, 'users', newUid);
+
+          const initialMonthlyPassbookEntry = {
+            month: activeMonth,
+            cycle: activeMonth,
+            date: record.date || currentDateStr,
+            ordinarySavings: record.ordinarySavings || 0,
+            specialSavings: record.specialSavings || 0,
+            investment: record.investment || 0,
+            commodityPurchase: record.commodityPurchase || 0,
+            muslimCommunity: record.muslimCommunity || 0,
+            loanReimbursement: record.loanReimbursement || 0,
+            total: record.total || 0,
+            status: 'verified',
+            createdAt: currentIsoStr
+          };
 
           const newMemberData = {
             id: assignedId,
@@ -796,6 +1102,8 @@ export default function BursaryDashboard() {
             fullName: record.name,
             name: record.name,
             surname: surname,
+            firstName: firstName,
+            defaultPassword: defaultPassword,
             email: targetEmail,
             role: 'member',
             status: 'active',
@@ -809,36 +1117,16 @@ export default function BursaryDashboard() {
             lastDeductionAmount: record.total,
             lastDeductionDate: currentIsoStr,
             lastDeductionBreakdown: deductionBreakdown,
+            monthlySavingsRecords: [initialMonthlyPassbookEntry],
             createdAt: currentIsoStr,
             mustChangePassword: true
           };
 
-          batch.set(newUserRef, newMemberData, { merge: true });
-
-          // Also create alias docs for uppercase surname (e.g., 'ABAS' or 'ABBAS') for direct lookup
-          if (surname) {
-            const surnameUpper = surname.toUpperCase();
-            const aliasRef1 = doc(db, 'users', surnameUpper);
-            batch.set(aliasRef1, newMemberData, { merge: true });
-
-            if (surname.toLowerCase() === 'abas') {
-              const aliasRef2 = doc(db, 'users', 'ABBAS');
-              batch.set(aliasRef2, newMemberData, { merge: true });
-            } else if (surname.toLowerCase() === 'abbas') {
-              const aliasRef2 = doc(db, 'users', 'ABAS');
-              batch.set(aliasRef2, newMemberData, { merge: true });
-            }
-          }
-
-          // Alias by spreadsheet S/N or record ID if provided
-          if (record.id && String(record.id).trim() !== assignedId) {
-            const idAliasRef = doc(db, 'users', String(record.id).trim().toUpperCase());
-            batch.set(idAliasRef, newMemberData, { merge: true });
-          }
+          await batchWriter.set(newUserRef, newMemberData, { merge: true });
 
           // Initial enrollment transactions
           const summaryTxRef = doc(collection(db, 'users', newUid, 'transactions'));
-          batch.set(summaryTxRef, {
+          await batchWriter.set(summaryTxRef, {
             date: currentDateStr,
             description: `Initial Payroll Deduction Enrollment - ${activeMonth}`,
             amount: `₦${Number(record.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -850,7 +1138,7 @@ export default function BursaryDashboard() {
 
           if (record.ordinarySavings > 0) {
             const osTxRef = doc(collection(db, 'users', newUid, 'transactions'));
-            batch.set(osTxRef, {
+            await batchWriter.set(osTxRef, {
               date: currentDateStr,
               description: `Ordinary Savings Initial Allocation (${activeMonth})`,
               amount: `₦${Number(record.ordinarySavings).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -863,7 +1151,7 @@ export default function BursaryDashboard() {
 
           if (record.specialSavings > 0) {
             const ssTxRef = doc(collection(db, 'users', newUid, 'transactions'));
-            batch.set(ssTxRef, {
+            await batchWriter.set(ssTxRef, {
               date: currentDateStr,
               description: `Special Savings Initial Allocation (${activeMonth})`,
               amount: `₦${Number(record.specialSavings).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -876,7 +1164,7 @@ export default function BursaryDashboard() {
 
           if (record.investment > 0) {
             const iaTxRef = doc(collection(db, 'users', newUid, 'transactions'));
-            batch.set(iaTxRef, {
+            await batchWriter.set(iaTxRef, {
               date: currentDateStr,
               description: `Investment Capital Initial Allocation (${activeMonth})`,
               amount: `₦${Number(record.investment).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -889,7 +1177,7 @@ export default function BursaryDashboard() {
 
           if (record.commodityPurchase > 0) {
             const cpTxRef = doc(collection(db, 'users', newUid, 'transactions'));
-            batch.set(cpTxRef, {
+            await batchWriter.set(cpTxRef, {
               date: currentDateStr,
               description: `Commodity Purchase Deduction (${activeMonth})`,
               amount: `₦${Number(record.commodityPurchase).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -902,7 +1190,7 @@ export default function BursaryDashboard() {
 
           if (record.muslimCommunity && record.muslimCommunity > 0) {
             const mcaTxRef = doc(collection(db, 'users', newUid, 'transactions'));
-            batch.set(mcaTxRef, {
+            await batchWriter.set(mcaTxRef, {
               date: currentDateStr,
               description: `Muslim Community Allocation (${activeMonth})`,
               amount: `₦${Number(record.muslimCommunity).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -916,7 +1204,9 @@ export default function BursaryDashboard() {
           newlyCreatedList.push({
             id: assignedId,
             name: record.name,
+            defaultPassword: defaultPassword,
             surname: surname,
+            firstName: firstName,
             email: targetEmail,
             initialDeduction: record.total || 0,
             ordinarySavings: record.ordinarySavings || 0,
@@ -949,12 +1239,14 @@ export default function BursaryDashboard() {
         });
         localStorage.setItem('zimco_pushed_deductions_registry', JSON.stringify(mergedRegistry));
         localStorage.setItem('zimco_all_members_register', JSON.stringify(updatedFirestoreMembers));
+        window.dispatchEvent(new CustomEvent('zimco_deductions_pushed', { detail: { count: recordsToProcess.length } }));
+        window.dispatchEvent(new StorageEvent('storage', { key: 'zimco_pushed_deductions_registry' }));
       } catch (cacheErr) {
         console.warn('LocalStorage push registry error:', cacheErr);
       }
 
       if (matchedCount > 0 || newMembersCreatedCount > 0) {
-        await batch.commit();
+        await batchWriter.commit();
         setFirestoreMembers(updatedFirestoreMembers);
       }
 
@@ -969,15 +1261,14 @@ export default function BursaryDashboard() {
           showToast(`Direct Push Successful! Provisioned ${newMembersCreatedCount} members & updated ledgers directly. No admin approval required.`, 'success');
           setShowNewMembersModal(true);
         } else {
-          showToast(`Direct Push Successful! Synchronized ${importedRecords.length} member ledgers directly. Member dashboards updated immediately!`, 'success');
+          showToast(`Direct Push Successful! Synchronized ${recordsToProcess.length} member ledgers directly. Member dashboards updated immediately!`, 'success');
         }
       }, 500);
 
     } catch (err) {
       console.error("Error writing batch to firestore:", err);
       setPushStatus('error');
-      showToast('Push transaction failed. Local state remains intact.', 'error');
-      handleFirestoreError(err, OperationType.WRITE, 'users');
+      showToast('Push encountered an issue. Local state remains preserved.', 'error');
     }
   };
 
@@ -1126,7 +1417,7 @@ export default function BursaryDashboard() {
   });
 
   return (
-    <div className="bg-[#f8fafc] text-slate-900 antialiased flex min-h-screen relative font-sans">
+    <div className="bg-surface text-on-surface antialiased flex min-h-screen relative font-sans">
       <SessionTimeoutListener onLogout={handleLogout} />
 
       {/* Broadcast Toast Notification system */}
@@ -1136,30 +1427,30 @@ export default function BursaryDashboard() {
             initial={{ opacity: 0, y: -40, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -40, scale: 0.95 }}
-            className={`fixed top-6 right-6 z-[200] max-w-sm rounded-[1.5rem] p-4 shadow-xl border flex items-start gap-3 ${
+            className={`fixed top-6 right-6 z-[200] max-w-sm rounded-2xl p-4 shadow-xl border flex items-start gap-3 ${
               toastNotification.type === 'error' 
-                ? 'bg-rose-50 border-rose-200 text-rose-950'
+                ? 'bg-error-container text-on-error-container border-error/30'
                 : toastNotification.type === 'warning'
-                ? 'bg-amber-50 border-amber-200 text-amber-950'
-                : 'bg-emerald-50 border-emerald-200 text-emerald-950'
+                ? 'bg-tertiary-container text-on-tertiary-container border-tertiary/30'
+                : 'bg-primary-container text-on-primary-container border-primary/30'
             }`}
           >
             {toastNotification.type === 'error' ? (
-              <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <AlertTriangle className="w-5 h-5 text-error shrink-0 mt-0.5" />
             ) : toastNotification.type === 'warning' ? (
-              <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <Info className="w-5 h-5 text-tertiary shrink-0 mt-0.5" />
             ) : (
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
             )}
             <div>
-              <p className="font-bold text-xs uppercase tracking-wider">Bursary Control Alert</p>
+              <p className="font-bold text-xs uppercase tracking-wider font-label">Bursary Control Alert</p>
               <p className="text-xs font-semibold mt-1 leading-relaxed">{toastNotification.message}</p>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Mobile Overlay */}
+      {/* Mobile Drawer Backdrop */}
       <AnimatePresence>
         {isSidebarOpen && (
           <motion.div 
@@ -1167,41 +1458,40 @@ export default function BursaryDashboard() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setIsSidebarOpen(false)}
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] lg:hidden"
+            className="fixed inset-0 bg-black/40 backdrop-blur-xs z-[60] lg:hidden"
           />
         )}
       </AnimatePresence>
 
-      {/* UNIQUE SIDEBAR NAVIGATION BAR */}
+      {/* SIDEBAR NAVIGATION BAR */}
       <aside className={`
-        fixed inset-y-0 left-0 z-[90] bg-[#091e14] text-slate-200 border-r border-[#143224] flex flex-col
+        fixed inset-y-0 left-0 bg-surface-container-low text-on-surface border-r border-outline-variant flex flex-col
         transition-all duration-300 ease-in-out shrink-0
-        lg:sticky lg:top-0 lg:h-screen
-        ${isSidebarOpen ? 'translate-x-0 w-72 shadow-2xl' : '-translate-x-full lg:translate-x-0'}
+        ${isSidebarOpen ? 'translate-x-0 w-72 shadow-2xl z-[90]' : '-translate-x-full lg:translate-x-0 z-40'}
         ${isSidebarCollapsed ? 'lg:w-20' : 'lg:w-72'}
       `}>
-        {/* Sidebar Header branding & 3-line Menu Toggle */}
-        <div className={`px-3.5 py-4 border-b border-[#143224] flex items-center min-h-[72px] ${isSidebarCollapsed ? 'justify-center' : 'justify-between gap-2.5'}`}>
-          {/* Desktop 3-line Menu Hamburger Toggle Button on Left */}
+        {/* Sidebar Header branding & Menu Toggle */}
+        <div className={`px-3.5 py-4 border-b border-outline-variant flex items-center min-h-[72px] shrink-0 ${isSidebarCollapsed ? 'justify-center' : 'justify-between gap-2.5'}`}>
+          {/* Desktop Menu Hamburger Toggle Button on Left */}
           <button 
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="hidden lg:flex p-2 rounded-xl text-slate-300 hover:text-emerald-400 hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
+            className="hidden lg:flex p-2 rounded-xl text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors shrink-0 cursor-pointer"
             title={isSidebarCollapsed ? "Show / Expand sidebar menu" : "Hide / Collapse sidebar menu"}
             aria-label={isSidebarCollapsed ? "Expand sidebar menu" : "Hide sidebar menu"}
           >
-            <Menu size={20} className="text-emerald-400" />
+            <Menu size={20} className="text-primary" />
           </button>
 
           {/* Branding Logo & Title */}
           {(!isSidebarCollapsed || isSidebarOpen) && (
             <div className="flex items-center gap-2.5 overflow-hidden flex-1">
-              <img src={zimcoLogo} alt="ZIMCO Logo" className="w-8 h-8 rounded-full object-cover ring-2 ring-emerald-500/30 shrink-0" referrerPolicy="no-referrer" />
+              <img src={zimcoLogo} alt="ZIMCO Logo" className="w-8 h-8 rounded-full object-cover ring-2 ring-primary/20 shrink-0" referrerPolicy="no-referrer" />
               <div className="whitespace-nowrap transition-opacity duration-200 overflow-hidden">
-                <div className="text-base font-black tracking-tight text-white flex items-center gap-1 leading-tight truncate">
+                <div className="text-base font-black tracking-tight text-primary flex items-center gap-1.5 leading-tight truncate font-headline">
                   ZIMCO 
-                  <span className="text-[9px] bg-emerald-500 text-slate-950 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">Bursary</span>
+                  <span className="text-[9px] bg-primary-container text-on-primary-container px-1.5 py-0.5 rounded font-black uppercase tracking-wider font-label">Bursary</span>
                 </div>
-                <div className="text-[9px] tracking-widest uppercase font-bold text-slate-400 mt-0.5 truncate">Deduction & Ingestion</div>
+                <div className="text-[9px] tracking-widest uppercase font-bold text-on-surface-variant mt-0.5 truncate font-label">Deduction & Ingestion</div>
               </div>
             </div>
           )}
@@ -1209,104 +1499,146 @@ export default function BursaryDashboard() {
           {/* Mobile Close Button */}
           <button 
             onClick={() => setIsSidebarOpen(false)}
-            className="lg:hidden p-2 text-slate-400 hover:text-white transition-colors ml-auto cursor-pointer"
+            className="lg:hidden p-2 text-on-surface-variant hover:text-on-surface transition-colors ml-auto cursor-pointer"
             aria-label="Close menu"
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* Unique Menu Navigation List */}
-        <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto custom-scrollbar">
-          <SidebarTabLink 
-            label="Dashboard" 
-            icon={<LayoutDashboard size={18} />} 
-            active={activeTab === 'dashboard'} 
-            collapsed={isSidebarCollapsed && !isSidebarOpen}
-            onClick={() => { setActiveTab('dashboard'); setIsSidebarOpen(false); }} 
-          />
-          <SidebarTabLink 
-            label="Import deduction file" 
-            icon={<FileSpreadsheet size={18} />} 
-            active={activeTab === 'import'} 
-            collapsed={isSidebarCollapsed && !isSidebarOpen}
-            badge={errorCount > 0 ? String(errorCount) : undefined}
-            badgeColor="bg-rose-600"
-            onClick={() => { setActiveTab('import'); setIsSidebarOpen(false); }} 
-          />
-          <SidebarTabLink 
-            label="Export deduction file" 
-            icon={<DownloadCloud size={18} />} 
-            active={activeTab === 'export'} 
-            collapsed={isSidebarCollapsed && !isSidebarOpen}
-            badge={modifiedRecords.length > 0 ? String(modifiedRecords.length) : undefined}
-            badgeColor="bg-amber-600"
-            onClick={() => { setActiveTab('export'); setIsSidebarOpen(false); }} 
-          />
-          <SidebarTabLink 
-            label="Reconciliation Check" 
-            icon={<RefreshCcw size={18} />} 
-            active={activeTab === 'reconcile'} 
-            collapsed={isSidebarCollapsed && !isSidebarOpen}
-            badge={errorCount > 0 ? `${errorCount} alerts` : undefined}
-            badgeColor="bg-rose-600"
-            onClick={() => { setActiveTab('reconcile'); setIsSidebarOpen(false); }} 
-          />
-          <SidebarTabLink 
-            label="Send to Bursary" 
-            icon={<Send size={18} />} 
-            active={activeTab === 'bursary_dispatch'} 
-            collapsed={isSidebarCollapsed && !isSidebarOpen}
-            badge="Next Cycle"
-            badgeColor="bg-emerald-500"
-            onClick={() => { setActiveTab('bursary_dispatch'); setIsSidebarOpen(false); }} 
-          />
-          <SidebarTabLink 
-            label="Member Directory" 
-            icon={<Users size={18} />} 
-            active={activeTab === 'members'} 
-            collapsed={isSidebarCollapsed && !isSidebarOpen}
-            badge={String(firestoreMembers.length || importedRecords.length || 0)}
-            badgeColor="bg-emerald-600"
-            onClick={() => { setActiveTab('members'); setIsSidebarOpen(false); }} 
-          />
-          <SidebarTabLink 
-            label="Settings" 
-            icon={<SettingsIcon size={18} />} 
-            active={activeTab === 'settings'} 
-            collapsed={isSidebarCollapsed && !isSidebarOpen}
-            onClick={() => { setActiveTab('settings'); setIsSidebarOpen(false); }} 
-          />
+        {/* Reorganized Menu Navigation List */}
+        <nav className="flex-1 min-h-0 px-3 py-3 space-y-4 overflow-y-auto custom-scrollbar">
+          {/* Group 1: THIS MONTH */}
+          <div className="space-y-1">
+            {(!isSidebarCollapsed || isSidebarOpen) && (
+              <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant font-label">
+                This Month
+              </p>
+            )}
+            <SidebarTabLink 
+              label="Active Cycle" 
+              icon={<LayoutDashboard size={18} />} 
+              active={activeTab === 'dashboard'} 
+              collapsed={isSidebarCollapsed && !isSidebarOpen}
+              onClick={() => { setActiveTab('dashboard'); setIsSidebarOpen(false); }} 
+            />
+            <SidebarTabLink 
+              label="Import Payroll Sheet" 
+              icon={<FileSpreadsheet size={18} />} 
+              active={activeTab === 'import' && payrollStep === 1} 
+              collapsed={isSidebarCollapsed && !isSidebarOpen}
+              badge={errorCount > 0 ? String(errorCount) : undefined}
+              badgeColor="bg-error text-on-error"
+              onClick={() => { setActiveTab('import'); setPayrollStep(1); setIsSidebarOpen(false); }} 
+            />
+            <SidebarTabLink 
+              label="Review & Fix" 
+              icon={<Edit3 size={18} />} 
+              active={activeTab === 'import' && payrollStep >= 2} 
+              collapsed={isSidebarCollapsed && !isSidebarOpen}
+              badge={importedRecords.length > 0 ? String(importedRecords.length) : undefined}
+              badgeColor="bg-primary text-on-primary"
+              onClick={() => { setActiveTab('import'); setPayrollStep(2); setIsSidebarOpen(false); }} 
+            />
+            <SidebarTabLink 
+              label="Reconcile vs Ledger" 
+              icon={<RefreshCcw size={18} />} 
+              active={activeTab === 'reconcile'} 
+              collapsed={isSidebarCollapsed && !isSidebarOpen}
+              badge={errorCount > 0 ? `${errorCount} alerts` : undefined}
+              badgeColor="bg-error text-on-error"
+              onClick={() => { setActiveTab('reconcile'); setIsSidebarOpen(false); }} 
+            />
+            <SidebarTabLink 
+              label="Next-Month Dispatch" 
+              icon={<Send size={18} />} 
+              active={activeTab === 'bursary_dispatch'} 
+              collapsed={isSidebarCollapsed && !isSidebarOpen}
+              badge="Next Cycle"
+              badgeColor="bg-secondary text-on-secondary"
+              onClick={() => { setActiveTab('bursary_dispatch'); setIsSidebarOpen(false); }} 
+            />
+          </div>
+
+          {/* Group 2: OVERVIEW */}
+          <div className="space-y-1 pt-2 border-t border-outline-variant/60">
+            {(!isSidebarCollapsed || isSidebarOpen) && (
+              <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant font-label">
+                Overview
+              </p>
+            )}
+            <SidebarTabLink 
+              label="Financial Trends" 
+              icon={<TrendingUp size={18} />} 
+              active={activeTab === 'dashboard'} 
+              collapsed={isSidebarCollapsed && !isSidebarOpen}
+              onClick={() => { setActiveTab('dashboard'); setIsSidebarOpen(false); }} 
+            />
+            <SidebarTabLink 
+              label="Member Directory" 
+              icon={<Users size={18} />} 
+              active={activeTab === 'members'} 
+              collapsed={isSidebarCollapsed && !isSidebarOpen}
+              badge={String(firestoreMembers.length || importedRecords.length || 0)}
+              badgeColor="bg-primary text-on-primary"
+              onClick={() => { setActiveTab('members'); setIsSidebarOpen(false); }} 
+            />
+          </div>
+
+          {/* Group 3: MANAGE */}
+          <div className="space-y-1 pt-2 border-t border-outline-variant/60">
+            {(!isSidebarCollapsed || isSidebarOpen) && (
+              <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant font-label">
+                Manage
+              </p>
+            )}
+            <SidebarTabLink 
+              label="Edit Deductions" 
+              icon={<DownloadCloud size={18} />} 
+              active={activeTab === 'export'} 
+              collapsed={isSidebarCollapsed && !isSidebarOpen}
+              badge={modifiedRecords.length > 0 ? String(modifiedRecords.length) : undefined}
+              badgeColor="bg-tertiary text-on-tertiary"
+              onClick={() => { setActiveTab('export'); setIsSidebarOpen(false); }} 
+            />
+            <SidebarTabLink 
+              label="Settings" 
+              icon={<SettingsIcon size={18} />} 
+              active={activeTab === 'settings'} 
+              collapsed={isSidebarCollapsed && !isSidebarOpen}
+              onClick={() => { setActiveTab('settings'); setIsSidebarOpen(false); }} 
+            />
+          </div>
         </nav>
 
         {/* Sidebar Footer details */}
-        <div className="p-3 border-t border-[#143224] mt-auto bg-[#07170f]">
+        <div className="p-3 border-t border-outline-variant mt-auto bg-surface-container-low">
           {(!isSidebarCollapsed || isSidebarOpen) ? (
             <div>
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20 shrink-0">
+                <div className="w-8 h-8 rounded-xl bg-primary-container flex items-center justify-center text-on-primary-container shrink-0">
                   <User size={16} />
                 </div>
                 <div className="truncate">
-                  <p className="text-xs font-bold text-white truncate">Chief Bursar Officer</p>
-                  <p className="text-[9px] text-slate-400 uppercase font-medium">Bursary Management</p>
+                  <p className="text-xs font-bold text-on-surface truncate">Chief Bursar Officer</p>
+                  <p className="text-[9px] text-on-surface-variant uppercase font-medium">Bursary Management</p>
                 </div>
               </div>
 
-              <div className="p-2.5 rounded-xl bg-[#092116] border border-[#143224] mb-3">
+              <div className="p-2.5 rounded-xl bg-surface-container border border-outline-variant/60 mb-3">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Ledger Cycle Lock</span>
-                  <span className="text-[8px] text-emerald-400 font-extrabold uppercase">Open</span>
+                  <span className="text-[8px] text-on-surface-variant font-bold uppercase tracking-wider">Ledger Cycle Lock</span>
+                  <span className="text-[8px] text-primary font-extrabold uppercase">Open</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Clock size={11} className="text-emerald-500" />
-                  <p className="text-[9px] font-semibold text-slate-300">Locking in {lockoutDate - new Date().getDate() || 15} days</p>
+                  <Clock size={11} className="text-primary" />
+                  <p className="text-[9px] font-semibold text-on-surface-variant">Locking in {Number(lockoutDate) - new Date().getDate() || 15} days</p>
                 </div>
               </div>
 
               <button 
                 onClick={handleLogout}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-slate-800 hover:bg-rose-900/60 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-surface-container-high hover:bg-error-container hover:text-on-error-container text-on-surface rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
               >
                 <LogOut size={13} />
                 Exit Portal
@@ -1315,7 +1647,7 @@ export default function BursaryDashboard() {
           ) : (
             <button 
               onClick={handleLogout}
-              className="w-full flex items-center justify-center p-2 text-slate-400 hover:text-rose-400 hover:bg-white/5 rounded-xl transition-colors"
+              className="w-full flex items-center justify-center p-2 text-on-surface-variant hover:text-error hover:bg-error-container/30 rounded-xl transition-colors cursor-pointer"
               title="Exit Portal (Logout)"
             >
               <LogOut size={18} />
@@ -1325,7 +1657,7 @@ export default function BursaryDashboard() {
       </aside>
 
       {/* Main Container Content */}
-      <div className="flex-grow flex flex-col min-h-screen min-w-0">
+      <div className={`flex-grow flex flex-col min-h-screen min-w-0 transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-72'}`}>
         
         {/* Custom Header Bar */}
         <header className="sticky top-0 h-16 bg-white/90 backdrop-blur-md shadow-sm border-b border-slate-100 flex items-center justify-between px-4 sm:px-6 md:px-8 z-30">
@@ -1360,6 +1692,16 @@ export default function BursaryDashboard() {
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <span className="truncate max-w-[120px] sm:max-w-none">Cycle: {activeMonth}</span>
             </div>
+
+            <button
+              id="btn-clear-cycle-header"
+              onClick={() => handleClearCycleRecords(activeMonth)}
+              title="Clear / Purge active cycle records from worksheet and database"
+              className="hidden md:inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-full transition-colors cursor-pointer"
+            >
+              <Trash2 size={12} />
+              Clear Cycle Data
+            </button>
             
             <div className="h-6 w-px bg-slate-200 hidden sm:block"></div>
 
@@ -1475,21 +1817,38 @@ export default function BursaryDashboard() {
                           </button>
                         ) : (
                           <button 
-                            onClick={handlePushToMembers}
-                            disabled={errorCount > 0}
-                            className={`px-6 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2.5 shadow transition-all ${
-                              errorCount > 0 
-                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-none'
-                                : 'bg-[#091e14] hover:bg-[#143224] text-white shadow-emerald-950/20 shadow-lg'
+                            id="btn-approve-and-push-dashboard"
+                            onClick={() => handlePushToMembers(false)}
+                            disabled={pushStatus === 'pushing'}
+                            className={`px-6 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2.5 shadow transition-all cursor-pointer ${
+                              pushStatus === 'pushing'
+                                ? 'bg-primary-container text-on-primary-container cursor-wait'
+                                : errorCount > 0 
+                                  ? 'bg-tertiary hover:bg-tertiary/90 text-on-tertiary shadow-md'
+                                  : 'bg-primary hover:bg-primary/90 text-on-primary shadow-xs'
                             }`}
                           >
-                            <Sparkles size={16} />
-                            Approve & Push to Member Dashboards
+                            {pushStatus === 'pushing' ? (
+                              <>
+                                <RefreshCcw size={16} className="animate-spin" />
+                                <span>Pushing Allocations ({pushProgress}%)...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles size={16} />
+                                <span>Approve & Push to Member Dashboards</span>
+                                {errorCount > 0 && (
+                                  <span className="ml-1 px-2 py-0.5 rounded-full bg-white/20 text-[10px] font-black">
+                                    {errorCount} Fixable
+                                  </span>
+                                )}
+                              </>
+                            )}
                           </button>
                         )}
                         {errorCount > 0 && (
-                          <span className="text-[9px] text-rose-600 font-extrabold mt-1.5 block text-center">
-                            * {errorCount} unresolved error blocks
+                          <span className="text-[9px] text-amber-700 font-extrabold mt-1.5 block text-center">
+                            * {errorCount} discrepancies can be auto-balanced on click
                           </span>
                         )}
                       </div>
@@ -1514,565 +1873,60 @@ export default function BursaryDashboard() {
               </motion.div>
             )}
 
-            {/* 2. IMPORT DEDUCTION FILE VIEW (spreadsheet reviewing & editing!) */}
+            {/* 2. IMPORT DEDUCTION FILE VIEW (3-Step Guided Stepper Workflow) */}
             {activeTab === 'import' && (
-              <motion.div 
-                key="import"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.25 }}
-                className="space-y-8"
-              >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider rounded-md">
-                        Dynamic ETL Ingestion
-                      </span>
-                      {parsedRawSheet && (
-                        <span className="text-xs text-slate-400 font-medium font-mono">
-                          {parsedRawSheet.fileName}
-                        </span>
-                      )}
-                    </div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight font-headline mt-1">
-                      Import Deduction Workbook
-                    </h1>
-                    <p className="text-sm text-slate-500 mt-0.5">
-                      Upload any Excel or CSV workbook, normalize columns, exclude unnecessary fields, and adjust allocations before deploying to member ledgers.
-                    </p>
-                  </div>
-                  
-                  <div className="flex flex-wrap items-center gap-2">
-                    {/* View Switcher if a sheet was parsed */}
-                    {parsedRawSheet && (
-                      <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
-                        <button
-                          onClick={() => setImportWorkflowStage('normalization')}
-                          className={`px-3.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition ${
-                            importWorkflowStage === 'normalization'
-                              ? 'bg-emerald-600 text-white shadow-sm'
-                              : 'text-slate-600 hover:text-slate-900'
-                          }`}
-                        >
-                          Sanitization & Account Cleaner
-                        </button>
-                        <button
-                          onClick={() => setImportWorkflowStage('review')}
-                          className={`px-3.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition ${
-                            importWorkflowStage === 'review'
-                              ? 'bg-slate-900 text-white shadow-sm'
-                              : 'text-slate-600 hover:text-slate-900'
-                          }`}
-                        >
-                          Review & Ledger Editor
-                        </button>
-                      </div>
-                    )}
-
-                    {newlyProvisionedMembers.length > 0 && (
-                      <button 
-                        onClick={() => setShowNewMembersModal(true)}
-                        className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm shadow-amber-500/20"
-                        title="View and download login credentials roster for newly detected members"
-                      >
-                        <UserCheck size={15} />
-                        New Member Credentials ({newlyProvisionedMembers.length})
-                      </button>
-                    )}
-
-                    <button 
-                      onClick={() => setShowSampleModal(true)}
-                      className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm shadow-emerald-900/20"
-                      title="Explore, download, or directly load 5 specialized Excel test files"
-                    >
-                      <FileSpreadsheet size={15} />
-                      5 Sample Excel Test Files
-                    </button>
-
-                    <button 
-                      onClick={handleDownloadTemplate}
-                      className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-1.5 border border-slate-200"
-                      title="Download a clean monthly deduction CSV template"
-                    >
-                      <DownloadCloud size={15} />
-                      Template
-                    </button>
-
-                    <button 
-                      onClick={handleImportClick}
-                      className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 shadow"
-                    >
-                      <Upload size={15} />
-                      Choose Excel Workbook
-                    </button>
-                    <input 
-                      type="file" 
-                      ref={fileInputRef} 
-                      className="hidden" 
-                      accept=".csv, .xlsx, .xls"
-                      onChange={handleFileChange}
-                    />
-                  </div>
-                </div>
-
-                {/* Import/Parsing State */}
-                {isParsing ? (
-                  <div className="bg-white border border-slate-100 rounded-[2.5rem] p-16 text-center shadow-sm space-y-4">
-                    <RefreshCcw className="w-12 h-12 text-emerald-600 animate-spin mx-auto" />
-                    <div>
-                      <p className="font-extrabold text-sm text-slate-800 uppercase tracking-widest">Parsing Spreadsheet Cells & Dynamic Columns</p>
-                      <p className="text-xs text-slate-500 mt-1">Extracting worksheet headers and running smart alias detection...</p>
-                    </div>
-                  </div>
-                ) : importWorkflowStage === 'normalization' && parsedRawSheet ? (
-                  /* 1. Dynamic Column Normalization & Exclusion Workbench */
-                  <DynamicNormalizationWorkbench
-                    parsedSheet={parsedRawSheet}
-                    ceilings={{ ordinarySavingsCeiling, specialSavingsCeiling }}
-                    onNormalizedComplete={handleNormalizationComplete}
-                    onCancel={() => setImportWorkflowStage('review')}
-                    showToast={showToast}
-                  />
-                ) : (
-                  /* 2. Review and Inline Verification Sheet */
-                  <div className="space-y-6">
-                    {/* Newly Identified Members Alert Banner */}
-                    {newlyProvisionedMembers.length > 0 && (
-                      <div className="bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-teal-500/10 border border-amber-300 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
-                        <div className="flex items-start sm:items-center gap-3.5">
-                          <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 font-bold shadow-sm">
-                            <UserCheck size={20} />
-                          </div>
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-xs font-black uppercase tracking-wider text-amber-950 bg-amber-200/80 px-2.5 py-0.5 rounded-md">
-                                {newlyProvisionedMembers.length} New Member Accounts Detected
-                              </span>
-                              <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md">
-                                Default Password: Surname (lowercase)
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-700 mt-1 leading-relaxed">
-                              These members are not in the current database. Their <strong>Zimco IDs</strong> will be assigned and their default password will be set to their <strong>surname</strong>.
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                          <button
-                            onClick={() => setShowNewMembersModal(true)}
-                            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shadow-md"
-                          >
-                            <DownloadCloud size={14} className="text-amber-400" />
-                            <span>View & Download Credentials List</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                    
-                    {/* Left Diagnostic Panel */}
-                    <div className="lg:col-span-1 bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm space-y-6 self-start">
-                      <h3 className="font-extrabold text-slate-900 text-sm tracking-wider uppercase">Workbook Quality</h3>
-                      
-                      <div className="space-y-4">
-                        <QualityStatBadge label="Total Rows" count={importedRecords.length} type="neutral" />
-                        <QualityStatBadge label="Critical Errors" count={errorCount} type="error" />
-                        <QualityStatBadge label="Warnings Flagged" count={warnCount} type="warning" />
-                        <QualityStatBadge label="Pass Verification" count={validCount} type="success" />
-                      </div>
-
-                      <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 text-[11px] leading-relaxed text-amber-800 font-medium">
-                        <div className="flex items-center gap-1.5 font-bold uppercase text-amber-950 mb-1">
-                          <AlertTriangle size={13} /> Review Guidelines
-                        </div>
-                        Before pushing deductions, all spreadsheet mathematical mismatch errors must be corrected manually using the inline editor tools.
-                      </div>
-                    </div>
-
-                    {/* Spreadsheet live editor workspace */}
-                    <div className={`bg-white border border-slate-100 shadow-sm overflow-hidden flex flex-col transition-all duration-200 ${
-                      isDeductionsTableExpanded 
-                        ? 'fixed inset-0 z-[100] rounded-none w-screen h-screen p-4 sm:p-6 bg-white' 
-                        : 'lg:col-span-3 rounded-[2rem]'
-                    }`}>
-                      
-                      {/* Live filter tab */}
-                      <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div className="flex items-center gap-2 bg-slate-200/50 p-1 rounded-xl">
-                            {(['all', 'error', 'warning', 'valid'] as const).map(f => (
-                              <button
-                                key={f}
-                                onClick={() => setDiagnosticFilter(f)}
-                                className={`px-3.5 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${
-                                  diagnosticFilter === f
-                                    ? f === 'error' ? 'bg-rose-600 text-white shadow-sm'
-                                    : f === 'warning' ? 'bg-amber-600 text-white shadow-sm'
-                                    : f === 'valid' ? 'bg-emerald-600 text-white shadow-sm'
-                                    : 'bg-slate-900 text-white shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-800'
-                                }`}
-                              >
-                                {f === 'all' ? 'All Rows' : f}
-                              </button>
-                            ))}
-                          </div>
-                          {isDeductionsTableExpanded && (
-                            <span className="text-xs font-bold text-slate-500 hidden md:inline">
-                              Full Screen Spreadsheet View ({activeMonth})
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <div className="relative">
-                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                            <input 
-                              type="text" 
-                              placeholder="Query name or ID..." 
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
-                              className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-emerald-600 w-44 font-semibold text-slate-800"
-                            />
-                          </div>
-                          <button
-                            id="btn-expand-deductions-table"
-                            type="button"
-                            onClick={() => setIsDeductionsTableExpanded(!isDeductionsTableExpanded)}
-                            className="p-2 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer border border-slate-200/60"
-                            title={isDeductionsTableExpanded ? "Restore table size" : "Expand table to full screen"}
-                          >
-                            {isDeductionsTableExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Spreadsheet layout */}
-                      <div className="overflow-x-auto custom-scrollbar">
-                        <table className="w-full text-left border-collapse">
-                          <thead>
-                            <tr className="bg-slate-50/50 border-b border-slate-100 text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider sm:tracking-widest">
-                              <th className="px-2.5 sm:px-4 py-2.5 sm:py-4 w-20 sm:w-28 text-[9px] sm:text-[10px]">Member ID</th>
-                              <th className="px-2 sm:px-3 py-2.5 sm:py-4 min-w-[90px] sm:min-w-[110px] text-[9px] sm:text-[10px]">Date (D/M/Y)</th>
-                              <th className="px-2.5 sm:px-4 py-2.5 sm:py-4 min-w-[120px] sm:min-w-[140px] text-[9px] sm:text-[10px]">Full Name</th>
-                              <th className="px-2 sm:px-3 py-2.5 sm:py-4 text-[9px] sm:text-[10px]">OS (₦)</th>
-                              <th className="px-2 sm:px-3 py-2.5 sm:py-4 text-[9px] sm:text-[10px]">SS (₦)</th>
-                              <th className="px-2 sm:px-3 py-2.5 sm:py-4 text-[9px] sm:text-[10px]">Inv (₦)</th>
-                              <th className="px-2 sm:px-3 py-2.5 sm:py-4 text-[9px] sm:text-[10px]">Loan (₦)</th>
-                              <th className="px-2 sm:px-3 py-2.5 sm:py-4 text-[9px] sm:text-[10px]">CP (₦)</th>
-                              <th className="px-2 sm:px-3 py-2.5 sm:py-4 text-[9px] sm:text-[10px]">MCA (₦)</th>
-                              <th className="px-2.5 sm:px-4 py-2.5 sm:py-4 text-right text-[9px] sm:text-[10px]">Sum (₦)</th>
-                              <th className="px-2.5 sm:px-4 py-2.5 sm:py-4 text-right text-[9px] sm:text-[10px]">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 text-[10px] sm:text-xs font-semibold text-slate-700">
-                            {displayRows.map(record => {
-                              const isEditing = editingRow?.id === record.id;
-                              return (
-                                <tr 
-                                  key={record.id}
-                                  className={`hover:bg-slate-50/40 transition-colors ${
-                                    record.status === 'error' ? 'bg-rose-50/10' : record.status === 'warning' ? 'bg-amber-50/10' : ''
-                                  }`}
-                                >
-                                  {/* ID */}
-                                  <td className="px-2.5 sm:px-4 py-2 sm:py-4 font-mono font-bold text-slate-500 text-[10px] sm:text-xs">
-                                    {isEditing ? (
-                                      <input 
-                                        type="text"
-                                        value={editingRow?.id || ''}
-                                        onChange={(e) => setEditingRow(prev => prev ? { ...prev, id: e.target.value } : null)}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1 text-[10px] sm:text-xs focus:ring-1 focus:ring-emerald-600 font-mono text-slate-800 font-bold"
-                                      />
-                                    ) : (
-                                      <span>{record.id}</span>
-                                    )}
-                                  </td>
-
-                                  {/* Date */}
-                                  <td className="px-2 sm:px-3 py-2 sm:py-4 font-mono text-[9px] sm:text-xs text-slate-600">
-                                    {isEditing ? (
-                                      <input 
-                                        type="text"
-                                        value={editingRow?.date || ''}
-                                        onChange={(e) => setEditingRow(prev => prev ? { ...prev, date: e.target.value } : null)}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1 text-[10px] sm:text-xs focus:ring-1 focus:ring-emerald-600 font-mono text-slate-800"
-                                        placeholder="YYYY-MM-DD"
-                                      />
-                                    ) : (
-                                      <span>{record.date || '—'}</span>
-                                    )}
-                                  </td>
-
-                                  {/* Name & status label info */}
-                                  <td className="px-2.5 sm:px-4 py-2 sm:py-4">
-                                    {isEditing ? (
-                                      <input 
-                                        type="text"
-                                        value={editingRow?.name || ''}
-                                        onChange={(e) => setEditingRow(prev => prev ? { ...prev, name: e.target.value } : null)}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1 text-[10px] sm:text-xs focus:ring-1 focus:ring-emerald-600 text-slate-800 font-bold"
-                                      />
-                                    ) : (
-                                      <div>
-                                        <p className="font-extrabold text-slate-800 flex items-center gap-1.5 text-[10px] sm:text-xs">
-                                          {record.name}
-                                          {record.isModified && (
-                                            <span className="px-1 py-0.2 bg-amber-100 text-amber-800 text-[7px] sm:text-[8px] rounded font-black uppercase tracking-wider">Modified</span>
-                                          )}
-                                        </p>
-                                        {record.message && (
-                                          <p className={`text-[8px] sm:text-[10px] font-bold mt-0.5 sm:mt-1 flex items-center gap-1 leading-normal ${
-                                            record.status === 'error' ? 'text-rose-600' : record.status === 'warning' ? 'text-amber-600' : 'text-slate-400'
-                                          }`}>
-                                            {record.status === 'error' && <AlertTriangle size={11} className="shrink-0" />}
-                                            {record.status === 'warning' && <Info size={11} className="shrink-0" />}
-                                            {record.status === 'valid' && <CheckCircle2 size={11} className="shrink-0 text-emerald-600" />}
-                                            {record.message}
-                                          </p>
-                                        )}
-                                      </div>
-                                    )}
-                                  </td>
-
-                                  {/* Ordinary Savings */}
-                                  <td className="px-2 sm:px-3 py-2 sm:py-4 text-[10px] sm:text-xs font-mono">
-                                    {isEditing ? (
-                                      <input 
-                                        type="number"
-                                        value={editingRow?.ordinarySavings ?? 0}
-                                        onChange={(e) => setEditingRow(prev => prev ? { ...prev, ordinarySavings: Number(e.target.value) } : null)}
-                                        className="w-16 sm:w-20 bg-slate-50 border border-slate-200 rounded-lg p-1 text-[10px] sm:text-xs focus:ring-1 focus:ring-emerald-600 font-mono text-slate-800"
-                                      />
-                                    ) : (
-                                      <span>₦{record.ordinarySavings.toLocaleString()}</span>
-                                    )}
-                                  </td>
-
-                                  {/* Special Savings */}
-                                  <td className="px-2 sm:px-3 py-2 sm:py-4 text-[10px] sm:text-xs font-mono">
-                                    {isEditing ? (
-                                      <input 
-                                        type="number"
-                                        value={editingRow?.specialSavings ?? 0}
-                                        onChange={(e) => setEditingRow(prev => prev ? { ...prev, specialSavings: Number(e.target.value) } : null)}
-                                        className="w-16 sm:w-20 bg-slate-50 border border-slate-200 rounded-lg p-1 text-[10px] sm:text-xs focus:ring-1 focus:ring-emerald-600 font-mono text-slate-800"
-                                      />
-                                    ) : (
-                                      <span>₦{record.specialSavings.toLocaleString()}</span>
-                                    )}
-                                  </td>
-
-                                  {/* Investment Account */}
-                                  <td className="px-2 sm:px-3 py-2 sm:py-4 text-[10px] sm:text-xs font-mono">
-                                    {isEditing ? (
-                                      <input 
-                                        type="number"
-                                        value={editingRow?.investment ?? 0}
-                                        onChange={(e) => setEditingRow(prev => prev ? { ...prev, investment: Number(e.target.value) } : null)}
-                                        className="w-16 sm:w-20 bg-slate-50 border border-slate-200 rounded-lg p-1 text-[10px] sm:text-xs focus:ring-1 focus:ring-emerald-600 font-mono text-slate-800"
-                                      />
-                                    ) : (
-                                      <span>₦{(record.investment || 0).toLocaleString()}</span>
-                                    )}
-                                  </td>
-
-                                  {/* Loan Payback */}
-                                  <td className="px-2 sm:px-3 py-2 sm:py-4 text-[10px] sm:text-xs font-mono">
-                                    {isEditing ? (
-                                      <input 
-                                        type="number"
-                                        value={editingRow?.loanReimbursement ?? 0}
-                                        onChange={(e) => setEditingRow(prev => prev ? { ...prev, loanReimbursement: Number(e.target.value) } : null)}
-                                        className="w-16 sm:w-20 bg-slate-50 border border-slate-200 rounded-lg p-1 text-[10px] sm:text-xs focus:ring-1 focus:ring-emerald-600 font-mono text-slate-800"
-                                      />
-                                    ) : (
-                                      <span>₦{record.loanReimbursement.toLocaleString()}</span>
-                                    )}
-                                  </td>
-
-                                  {/* Commodity Purchase */}
-                                  <td className="px-2 sm:px-3 py-2 sm:py-4 text-[10px] sm:text-xs font-mono">
-                                    {isEditing ? (
-                                      <input 
-                                        type="number"
-                                        value={editingRow?.commodityPurchase ?? 0}
-                                        onChange={(e) => setEditingRow(prev => prev ? { ...prev, commodityPurchase: Number(e.target.value) } : null)}
-                                        className="w-16 sm:w-20 bg-slate-50 border border-slate-200 rounded-lg p-1 text-[10px] sm:text-xs focus:ring-1 focus:ring-emerald-600 font-mono text-slate-800"
-                                      />
-                                    ) : (
-                                      <span>₦{(record.commodityPurchase || 0).toLocaleString()}</span>
-                                    )}
-                                  </td>
-
-                                  {/* Muslim Community */}
-                                  <td className="px-2 sm:px-3 py-2 sm:py-4 text-[10px] sm:text-xs font-mono">
-                                    {isEditing ? (
-                                      <input 
-                                        type="number"
-                                        value={editingRow?.muslimCommunity ?? 0}
-                                        onChange={(e) => setEditingRow(prev => prev ? { ...prev, muslimCommunity: Number(e.target.value) } : null)}
-                                        className="w-16 sm:w-20 bg-slate-50 border border-slate-200 rounded-lg p-1 text-[10px] sm:text-xs focus:ring-1 focus:ring-emerald-600 font-mono text-slate-800"
-                                      />
-                                    ) : (
-                                      <span>₦{(record.muslimCommunity || 0).toLocaleString()}</span>
-                                    )}
-                                  </td>
-
-                                  {/* Row Total */}
-                                  <td className="px-2.5 sm:px-4 py-2 sm:py-4 text-right font-mono">
-                                    {isEditing ? (
-                                      <div>
-                                        <input 
-                                          type="number"
-                                          value={editingRow?.total ?? 0}
-                                          onChange={(e) => setEditingRow(prev => prev ? { ...prev, total: Number(e.target.value) } : null)}
-                                          className="w-20 sm:w-24 bg-slate-50 border border-emerald-500 rounded-lg p-1 text-[10px] sm:text-xs font-bold font-mono text-slate-800 text-right focus:ring-1 focus:ring-emerald-600"
-                                        />
-                                        <span className="text-[7px] sm:text-[8px] text-emerald-600 block mt-0.5 sm:mt-1 font-bold">
-                                          Calc: ₦{((editingRow?.ordinarySavings || 0) + (editingRow?.specialSavings || 0) + (editingRow?.investment || 0) + (editingRow?.commodityPurchase || 0) + (editingRow?.loanReimbursement || 0) + (editingRow?.muslimCommunity || 0)).toLocaleString()}
-                                        </span>
-                                      </div>
-                                    ) : (
-                                      <span className="text-xs sm:text-sm font-black text-slate-800">
-                                        ₦{(record.ordinarySavings + record.specialSavings + (record.investment || 0) + (record.commodityPurchase || 0) + record.loanReimbursement + (record.muslimCommunity || 0)).toLocaleString()}
-                                      </span>
-                                    )}
-                                  </td>
-
-                                  {/* Row actions */}
-                                  <td className="px-2.5 sm:px-4 py-2 sm:py-4 text-right">
-                                    <div className="flex items-center justify-end gap-1 sm:gap-2">
-                                      {isEditing ? (
-                                        <>
-                                          <button 
-                                            onClick={handleSaveEdit}
-                                            className="p-1 px-2 sm:px-2.5 bg-emerald-600 text-white rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-wider hover:bg-emerald-700 transition"
-                                          >
-                                            Save
-                                          </button>
-                                          <button 
-                                            onClick={() => setEditingRow(null)}
-                                            className="p-1 px-2 sm:px-2.5 bg-slate-100 text-slate-500 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-wider hover:bg-slate-200 transition"
-                                          >
-                                            Cancel
-                                          </button>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <button 
-                                            onClick={() => setEditingRow({ ...record })}
-                                            className="p-1 sm:p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-slate-100 rounded-lg transition"
-                                            title="Edit allocations cell"
-                                          >
-                                            <Edit3 size={13} />
-                                          </button>
-                                          {record.status === 'warning' && (
-                                            <button 
-                                              onClick={() => handleBypassWarning(record.id)}
-                                              className="p-1 bg-amber-50 text-amber-700 text-[8px] sm:text-[9px] font-black rounded-lg uppercase tracking-wider hover:bg-amber-100 transition"
-                                            >
-                                              Bypass
-                                            </button>
-                                          )}
-                                          <button 
-                                            onClick={() => handleDeleteRow(record.id, record.name)}
-                                            className="p-1 sm:p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                                            title="Delete entry"
-                                          >
-                                            <Trash2 size={13} />
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                            {displayRows.length === 0 && (
-                              <tr>
-                                <td colSpan={11} className="text-center py-12 text-slate-400">
-                                  <div className="flex flex-col items-center justify-center gap-3">
-                                    <FileSpreadsheet className="w-10 h-10 text-emerald-600/50" />
-                                    <div>
-                                      <p className="text-sm font-black text-slate-800">No Ingestion Records Loaded</p>
-                                      <p className="text-xs text-slate-500 max-w-sm mt-0.5">
-                                        Upload your June 2026 payroll deduction workbook (.xlsx, .xls, or .csv) to populate the spreadsheet ledger.
-                                      </p>
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-2">
-                                      <button
-                                        type="button"
-                                        onClick={handleImportClick}
-                                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer flex items-center gap-2 shadow-sm"
-                                      >
-                                        <Upload size={14} />
-                                        <span>Choose Excel File</span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setShowSampleModal(true)}
-                                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
-                                      >
-                                        Load Sample Test Workbook
-                                      </button>
-                                    </div>
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* Deploy Ledger Action Footer */}
-                      <div className="p-6 bg-slate-50 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div>
-                          <p className="text-xs font-bold text-slate-800">Deploy Sheet Status</p>
-                          <p className="text-[10px] text-slate-400 mt-0.5 font-medium">
-                            {importedRecords.length === 0
-                              ? 'No spreadsheet records loaded yet. Upload your payroll file to deploy.'
-                              : errorCount > 0 
-                                ? `${errorCount} critical mathematical mismatches must be resolved.` 
-                                : 'Workbook certified. Ready to deploy allocations.'}
-                          </p>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2">
-                          {newlyProvisionedMembers.length > 0 && (
-                            <button
-                              onClick={() => setShowNewMembersModal(true)}
-                              className="px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 transition-all"
-                            >
-                              <UserCheck size={14} className="text-amber-600" />
-                              <span>Login Credentials ({newlyProvisionedMembers.length})</span>
-                            </button>
-                          )}
-
-                          <button 
-                            onClick={handlePushToMembers}
-                            disabled={errorCount > 0 || importedRecords.length === 0}
-                            className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 shadow transition-all ${
-                              errorCount > 0 || importedRecords.length === 0
-                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-none shadow-none'
-                                : 'bg-primary hover:bg-emerald-800 text-on-primary hover:shadow-lg'
-                            }`}
-                          >
-                            <Sparkles size={14} />
-                            Approve & Push Directly to Member Accounts
-                          </button>
-                        </div>
-                      </div>
-
-                    </div>
-                  </div>
-                </div>
-              )}
-              </motion.div>
+              <PayrollImportStepper
+                currentStep={payrollStep}
+                setCurrentStep={setPayrollStep}
+                parsedRawSheet={parsedRawSheet}
+                importWorkflowStage={importWorkflowStage}
+                setImportWorkflowStage={setImportWorkflowStage}
+                handleImportClick={handleImportClick}
+                handleFileChange={handleFileChange}
+                fileInputRef={fileInputRef}
+                isParsing={isParsing}
+                setShowSampleModal={setShowSampleModal}
+                handleDownloadTemplate={handleDownloadTemplate}
+                handleNormalizationComplete={handleNormalizationComplete}
+                ceilings={{ ordinarySavingsCeiling, specialSavingsCeiling }}
+                showToast={showToast}
+                importedRecords={importedRecords}
+                modifiedRecords={modifiedRecords}
+                errorCount={errorCount}
+                warnCount={warnCount}
+                validCount={validCount}
+                totalPoolSum={totalPoolSum}
+                ordSavingsSum={ordSavingsSum}
+                specSavingsSum={specSavingsSum}
+                investSum={investSum}
+                commoditySum={commoditySum}
+                loanRepaySum={loanRepaySum}
+                mcaSum={mcaSum}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                diagnosticFilter={diagnosticFilter}
+                setDiagnosticFilter={setDiagnosticFilter}
+                isDeductionsTableExpanded={isDeductionsTableExpanded}
+                setIsDeductionsTableExpanded={setIsDeductionsTableExpanded}
+                editingRow={editingRow}
+                setEditingRow={setEditingRow}
+                handleSaveEdit={handleSaveEdit}
+                handleBypassWarning={handleBypassWarning}
+                handleDeleteRow={handleDeleteRow}
+                handleAutoBalanceAllMismatches={handleAutoBalanceAllMismatches}
+                newlyProvisionedMembers={newlyProvisionedMembers}
+                setShowNewMembersModal={setShowNewMembersModal}
+                pushStatus={pushStatus}
+                pushProgress={pushProgress}
+                handlePushToMembers={handlePushToMembers}
+                activeMonth={activeMonth}
+                setActiveMonth={setActiveMonth}
+                onNavigateToReconcile={() => setActiveTab('reconcile')}
+                onNavigateToExport={() => setActiveTab('export')}
+                onSwitchSheet={handleSwitchSheet}
+                importMode={importMode}
+                setImportMode={setImportMode}
+              />
             )}
 
             {/* 3. EXPORT DEDUCTION FILE VIEW (Reversion controls & next month preparation!) */}
@@ -2182,8 +2036,8 @@ export default function BursaryDashboard() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-                              {modifiedRecords.map(r => (
-                                <tr key={r.id}>
+                              {modifiedRecords.map((r, rIdx) => (
+                                <tr key={`${r.id || 'mod'}-${rIdx}`}>
                                   <td className="py-3.5">
                                     <p className="font-extrabold text-slate-800">{r.name}</p>
                                     <p className="text-[9px] font-mono text-slate-400 mt-0.5">{r.id}</p>
@@ -2212,26 +2066,26 @@ export default function BursaryDashboard() {
                     {/* Dual export cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {/* Current Month Export */}
-                      <div className="bg-[#091e14] text-white border border-[#143224] rounded-[2rem] p-6 shadow-sm flex flex-col justify-between min-h-[16rem] relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-bl-full"></div>
+                      <div className="bg-surface-container-lowest text-on-surface border border-outline-variant rounded-2xl p-6 shadow-xs flex flex-col justify-between min-h-[16rem] relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-bl-full"></div>
                         <div>
-                          <span className="text-[9px] bg-emerald-500/10 text-emerald-400 font-bold px-2 py-0.5 rounded uppercase tracking-wider">Active Batch export</span>
-                          <h4 className="text-lg font-bold mt-2">Final Current Cycle Workbook</h4>
-                          <p className="text-[11px] text-slate-350 text-slate-400 mt-1 leading-relaxed">
+                          <span className="text-[9px] bg-primary-container text-on-primary-container font-bold px-2 py-0.5 rounded uppercase tracking-wider font-label">Active Batch export</span>
+                          <h4 className="text-lg font-bold mt-2 font-headline">Final Current Cycle Workbook</h4>
+                          <p className="text-[11px] text-on-surface-variant mt-1 leading-relaxed">
                             Download the finalized, reviewed deductions sheet representing modified values active for the current month.
                           </p>
                         </div>
                         <div className="grid grid-cols-2 gap-3 pt-4">
                           <button 
                             onClick={() => handleExportFile('xlsx', false)}
-                            className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5"
+                            className="w-full py-2.5 bg-primary hover:bg-primary/90 text-on-primary rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs font-label"
                           >
                             <FileSpreadsheet size={14} />
                             Excel (.xlsx)
                           </button>
                           <button 
                             onClick={() => handleExportFile('csv', false)}
-                            className="w-full py-2.5 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-200 border border-emerald-800 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5"
+                            className="w-full py-2.5 bg-surface-container hover:bg-surface-container-high text-on-surface border border-outline-variant rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer font-label"
                           >
                             <DownloadCloud size={14} />
                             CSV (.csv)
@@ -2240,7 +2094,7 @@ export default function BursaryDashboard() {
                       </div>
 
                       {/* Next Month Template Prep */}
-                      <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex flex-col justify-between min-h-[16rem] relative overflow-hidden group">
+                      <div className="bg-surface-container-lowest text-on-surface border border-outline-variant rounded-2xl p-6 shadow-xs flex flex-col justify-between min-h-[16rem] relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-bl-full"></div>
                         <div>
                           <span className="text-[9px] bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded uppercase tracking-wider">Next Month sheet prep</span>
@@ -2436,7 +2290,7 @@ export default function BursaryDashboard() {
                 exit={{ opacity: 0, y: -15 }}
                 transition={{ duration: 0.25 }}
               >
-                <AdminMemberDirectory
+                <BursaryMemberRoster
                   importedRecords={importedRecords}
                   firestoreMembers={firestoreMembers}
                   showToast={showToast}
@@ -2468,6 +2322,131 @@ export default function BursaryDashboard() {
         activeMonth={activeMonth}
         showToast={showToast}
       />
+
+      {/* Pre-Push Math Discrepancy Resolution Modal */}
+      {showErrorResolutionModal && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-white rounded-[2rem] max-w-2xl w-full border border-slate-100 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          >
+            {/* Modal Header */}
+            <div className="p-6 bg-gradient-to-r from-amber-50 to-orange-50/50 border-b border-amber-100 flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-900 flex items-center justify-center shrink-0">
+                  <AlertOctagon size={22} className="text-amber-600" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black text-slate-900">Pre-Push Audit Discrepancy Review</h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-800">
+                      {errorCount} Mismatches
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    Some rows have declared totals that do not equal the sum of their itemized deductions.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowErrorResolutionModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Flagged Rows List */}
+            <div className="p-6 overflow-y-auto space-y-4 max-h-[45vh] bg-slate-50/50">
+              <div className="space-y-2">
+                {importedRecords
+                  .filter(r => r.status === 'error')
+                  .slice(0, 10)
+                  .map((row, idx) => {
+                    const sum = Number(row.ordinarySavings || 0) + Number(row.specialSavings || 0) + Number(row.investment || 0) + Number(row.commodityPurchase || 0) + Number(row.loanReimbursement || 0) + Number(row.muslimCommunity || 0);
+                    const diff = Math.abs(sum - Number(row.total || 0));
+                    return (
+                      <div key={`${row.id || 'err'}-${idx}`} className="p-3 bg-white rounded-xl border border-rose-100 flex items-center justify-between gap-4 text-xs shadow-2xs">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-slate-500 text-[10px]">{row.id}</span>
+                            <span className="font-bold text-slate-900 truncate">{row.name}</span>
+                          </div>
+                          <p className="text-[10px] text-rose-700 mt-0.5 truncate">{row.message}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="font-mono text-[11px]">
+                            <span className="text-slate-400">Total: </span>
+                            <span className="font-bold text-slate-800">₦{Number(row.total).toLocaleString()}</span>
+                            <span className="text-slate-400"> | Sum: </span>
+                            <span className="font-bold text-emerald-700">₦{sum.toLocaleString()}</span>
+                          </div>
+                          <span className="text-[10px] text-amber-600 font-semibold">Diff: ₦{diff.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                {errorCount > 10 && (
+                  <p className="text-center text-[10px] text-slate-500 font-medium pt-1">
+                    ...and {errorCount - 10} additional mismatched records.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="p-6 bg-white border-t border-slate-100 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Auto-Balance & Push */}
+                <button
+                  id="btn-modal-autobalance-push"
+                  onClick={() => handlePushToMembers(true)}
+                  className="p-3 bg-primary hover:bg-emerald-800 text-on-primary rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
+                >
+                  <Wand2 size={16} />
+                  <span>Auto-Balance & Push All ({importedRecords.length})</span>
+                </button>
+
+                {/* Push Valid Only */}
+                <button
+                  id="btn-modal-push-valid-only"
+                  onClick={() => handlePushToMembers(false, true)}
+                  disabled={importedRecords.length - errorCount <= 0}
+                  className="p-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
+                >
+                  <CheckCheck size={16} />
+                  <span>Push Valid Only ({importedRecords.length - errorCount})</span>
+                </button>
+              </div>
+
+              {/* Review In Table */}
+              <div className="flex items-center justify-between pt-1">
+                <button
+                  onClick={() => {
+                    setShowErrorResolutionModal(false);
+                    setDiagnosticFilter('error');
+                    setActiveTab('import');
+                    setImportWorkflowStage('review');
+                  }}
+                  className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 transition"
+                >
+                  <span>Filter table to error rows to edit manually</span>
+                  <ArrowRight size={12} />
+                </button>
+
+                <button
+                  onClick={() => setShowErrorResolutionModal(false)}
+                  className="text-xs font-bold text-slate-400 hover:text-slate-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2487,12 +2466,12 @@ function SidebarTabLink({ label, icon, active, badge, badgeColor = 'bg-primary',
     <button 
       onClick={onClick}
       title={collapsed ? label : undefined}
-      className={`w-full flex items-center gap-3 px-3.5 py-2.5 transition-all duration-200 rounded-xl text-xs uppercase tracking-wider font-bold ${
+      className={`w-full flex items-center gap-3 px-3.5 py-2.5 transition-all duration-200 rounded-xl text-xs uppercase tracking-wider font-bold cursor-pointer font-label ${
         collapsed ? 'lg:justify-center' : 'justify-between'
       } ${
         active 
-          ? 'bg-[#143224] text-white shadow-md shadow-emerald-950/10' 
-          : 'text-slate-400 hover:text-white hover:bg-white/5'
+          ? 'bg-primary text-on-primary shadow-xs' 
+          : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
       }`}
     >
       <div className="flex items-center gap-3 truncate">

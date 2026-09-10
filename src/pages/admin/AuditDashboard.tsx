@@ -76,61 +76,9 @@ interface AuditLog {
   status: 'verified' | 'flagged' | 'pending';
 }
 
-const AUDIT_LOGS_MOCK: AuditLog[] = [
-  {
-    id: 'AUD-9021',
-    timestamp: 'Today, 10:42 AM',
-    actor: 'Bursary Admin',
-    role: 'Bursary Manager',
-    action: 'Payroll Ledger Deduction Ingested',
-    category: 'Bursary',
-    details: 'Synchronized monthly deductions across 64 member accounts with zero math exceptions.',
-    status: 'verified'
-  },
-  {
-    id: 'AUD-9020',
-    timestamp: 'Today, 09:15 AM',
-    actor: 'Audit Controller',
-    role: 'Society Auditor',
-    action: 'Muslim Community Account Balance Reconciled',
-    category: 'MCA',
-    details: 'Verified Muslim Community Account (MCA) escrow segregation. Total holdings match statutory reserve bank transcript.',
-    status: 'verified'
-  },
-  {
-    id: 'AUD-9019',
-    timestamp: 'Yesterday, 04:30 PM',
-    actor: 'Credit Committee',
-    role: 'Loan Admin',
-    action: 'Disbursement Reconciliation',
-    category: 'Loans',
-    details: 'Approved and cross-referenced ₦3,500,000 in medical equipment micro-loans against share capital limits.',
-    status: 'verified'
-  },
-  {
-    id: 'AUD-9018',
-    timestamp: 'Yesterday, 02:10 PM',
-    actor: 'Security Daemon',
-    role: 'System',
-    action: 'Cryptographic Ledger Checksum Verified',
-    category: 'System',
-    details: 'SHA-256 member balance root tree verified with zero integrity deviations.',
-    status: 'verified'
-  },
-  {
-    id: 'AUD-9017',
-    timestamp: '2 days ago',
-    actor: 'Compliance Officer',
-    role: 'Compliance Lead',
-    action: 'Statutory Reserve Ratio Audit',
-    category: 'Compliance',
-    details: 'Reserve requirement maintained at 24.2%, exceeding statutory 20% minimum threshold.',
-    status: 'verified'
-  }
-];
-
 export default function AuditDashboard() {
   const [members, setMembers] = useState<MemberAccountRecord[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [accountFilter, setAccountFilter] = useState<'all' | 'mca' | 'loans' | 'special' | 'commodity'>('all');
@@ -151,9 +99,16 @@ export default function AuditDashboard() {
     try {
       const snap = await getDocs(collection(db, 'users'));
       if (!snap.empty) {
-        const list: MemberAccountRecord[] = [];
+        const memberMap = new Map<string, MemberAccountRecord>();
         snap.forEach(docSnap => {
           const data = docSnap.data();
+          if (data.isAlias) return; // Skip explicit alias docs
+          
+          const rawId = data.id || data.memberId || docSnap.id;
+          const canonicalKey = String(rawId).trim().toUpperCase();
+          if (!canonicalKey) return;
+
+          const isExactDocMatch = docSnap.id.toUpperCase() === canonicalKey;
           const os = Number(data.ordinarySavings) || 0;
           const ss = Number(data.specialSavings) || 0;
           const ia = Number(data.investmentAmount) || 0;
@@ -163,10 +118,10 @@ export default function AuditDashboard() {
           const totalAssets = os + ss + ia + cp + mca;
           const netBalance = totalAssets - loans;
 
-          list.push({
+          const memberRecord: MemberAccountRecord = {
             id: data.id || docSnap.id,
             uid: docSnap.id,
-            fullName: data.fullName || 'Registered Contributor',
+            fullName: data.fullName || data.name || 'Registered Contributor',
             email: data.email || '',
             department: data.department || 'General Administration',
             ordinarySavings: os,
@@ -182,10 +137,16 @@ export default function AuditDashboard() {
             lastDeductionAmount: Number(data.lastDeductionAmount) || undefined,
             lastDeductionDate: data.lastDeductionDate || undefined,
             lastDeductionBreakdown: data.lastDeductionBreakdown || undefined
-          });
+          };
+
+          if (!memberMap.has(canonicalKey)) {
+            memberMap.set(canonicalKey, memberRecord);
+          } else if (isExactDocMatch) {
+            memberMap.set(canonicalKey, memberRecord);
+          }
         });
 
-        setMembers(list);
+        setMembers(Array.from(memberMap.values()));
       } else {
         setMembers([]);
       }
@@ -245,18 +206,18 @@ export default function AuditDashboard() {
     try {
       const items = filteredMembers.map(m => {
         const breakdown = m.lastDeductionBreakdown;
-        const os = breakdown?.ordinarySavings !== undefined ? breakdown.ordinarySavings : (m.ordinarySavings > 50000 ? Math.round(m.ordinarySavings * 0.1) : (m.ordinarySavings || 25000));
-        const ss = breakdown?.specialSavings !== undefined ? breakdown.specialSavings : (m.specialSavings > 20000 ? Math.round(m.specialSavings * 0.1) : (m.specialSavings || 10000));
-        const inv = breakdown?.investment !== undefined ? breakdown.investment : (m.investmentAmount ? Math.min(50000, Math.round(m.investmentAmount * 0.1)) : 0);
-        const lr = breakdown?.loanReimbursement !== undefined ? breakdown.loanReimbursement : (m.outstandingLoans ? Math.min(60000, Math.round(m.outstandingLoans * 0.15)) : 0);
-        const cp = breakdown?.commodityPurchase !== undefined ? breakdown.commodityPurchase : (m.commoditySavings ? Math.min(30000, Math.round(m.commoditySavings * 0.2)) : 0);
-        const mc = breakdown?.muslimCommunity !== undefined ? breakdown.muslimCommunity : (m.muslimCommunitySavings ? Math.min(25000, Math.round(m.muslimCommunitySavings * 0.1)) : 0);
+        const os = breakdown?.ordinarySavings !== undefined ? breakdown.ordinarySavings : Number(m.ordinarySavings || 0);
+        const ss = breakdown?.specialSavings !== undefined ? breakdown.specialSavings : Number(m.specialSavings || 0);
+        const inv = breakdown?.investment !== undefined ? breakdown.investment : Number(m.investmentAmount || 0);
+        const lr = breakdown?.loanReimbursement !== undefined ? breakdown.loanReimbursement : Number(m.outstandingLoans || 0);
+        const cp = breakdown?.commodityPurchase !== undefined ? breakdown.commodityPurchase : Number(m.commoditySavings || 0);
+        const mc = breakdown?.muslimCommunity !== undefined ? breakdown.muslimCommunity : Number(m.muslimCommunitySavings || 0);
         const total = os + ss + inv + lr + cp + mc;
 
         return {
           id: m.id,
           name: m.fullName,
-          department: m.department || 'General',
+          department: m.department || '',
           date: m.lastDeductionDate ? m.lastDeductionDate.split('T')[0] : effectiveDeductionDate,
           ordinarySavings: os,
           specialSavings: ss,
@@ -759,7 +720,7 @@ export default function AuditDashboard() {
 
             {/* Member Accounting Ledger Table */}
             <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse min-w-[820px]">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100 text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider sm:tracking-widest">
                     <th className="px-2.5 sm:px-4 py-2.5 sm:py-3.5">Member ID</th>
@@ -775,8 +736,8 @@ export default function AuditDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-[10px] sm:text-xs font-semibold text-slate-700">
-                  {filteredMembers.map(m => (
-                    <tr key={m.id} className="hover:bg-slate-50/70 transition-colors">
+                  {filteredMembers.map((m, mIdx) => (
+                    <tr key={`${m.id || 'mem'}-${mIdx}`} className="hover:bg-slate-50/70 transition-colors">
                       <td className="px-2.5 sm:px-4 py-2 sm:py-3.5 font-mono font-bold text-slate-500 text-[10px] sm:text-xs">{m.id}</td>
                       <td className="px-2.5 sm:px-4 py-2 sm:py-3.5">
                         <p className="font-extrabold text-slate-900 text-[11px] sm:text-xs">{m.fullName}</p>
@@ -892,7 +853,7 @@ export default function AuditDashboard() {
             </div>
             
             <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse min-w-[680px]">
                 <thead>
                   <tr className="bg-slate-50 text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider sm:tracking-widest border-b border-slate-100">
                     <th className="px-2.5 sm:px-4 py-2.5 sm:py-3.5">Staff ID</th>
@@ -904,10 +865,10 @@ export default function AuditDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-[10px] sm:text-xs font-semibold text-slate-700">
-                  {members.filter(m => m.muslimCommunitySavings > 0).map(m => {
+                  {members.filter(m => m.muslimCommunitySavings > 0).map((m, mIdx) => {
                     const share = ((m.muslimCommunitySavings / (totalMuslimCommunitySavings || 1)) * 100).toFixed(1);
                     return (
-                      <tr key={m.id} className="hover:bg-teal-50/20 transition-colors">
+                      <tr key={`${m.id || 'mca'}-${mIdx}`} className="hover:bg-teal-50/20 transition-colors">
                         <td className="px-2.5 sm:px-4 py-2 sm:py-3.5 font-mono font-bold text-slate-500 text-[10px] sm:text-xs">{m.id}</td>
                         <td className="px-2.5 sm:px-4 py-2 sm:py-3.5 font-bold text-slate-900 text-[11px] sm:text-xs">{m.fullName}</td>
                         <td className="px-2.5 sm:px-4 py-2 sm:py-3.5 text-slate-500 text-[10px] sm:text-xs">{m.department || 'General'}</td>
@@ -949,35 +910,47 @@ export default function AuditDashboard() {
           </div>
 
           <div className="space-y-3">
-            {AUDIT_LOGS_MOCK.map(log => (
-              <div key={log.id} className="p-4 rounded-2xl bg-slate-50 hover:bg-slate-100/80 transition border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-start gap-3.5">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                    log.category === 'MCA' ? 'bg-teal-100 text-teal-800' :
-                    log.category === 'Bursary' ? 'bg-emerald-100 text-emerald-800' :
-                    log.category === 'Loans' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
-                  }`}>
-                    <ShieldCheck size={18} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs font-black text-slate-900">{log.action}</p>
-                      <span className="px-1.5 py-0.5 bg-white border border-slate-200 text-slate-600 text-[9px] font-bold uppercase rounded">
-                        {log.category}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">{log.details}</p>
-                    <p className="text-[10px] text-slate-400 font-mono mt-1">Ref ID: {log.id} • Initiated by: {log.actor} ({log.role})</p>
-                  </div>
+            {auditLogs.length === 0 ? (
+              <div className="py-12 px-4 text-center bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center mb-3">
+                  <ShieldCheck size={24} />
                 </div>
-                <div className="sm:text-right shrink-0">
-                  <span className="text-[10px] font-bold text-slate-400 block">{log.timestamp}</span>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded-full mt-1">
-                    <CheckCircle2 size={10} /> Certified
-                  </span>
-                </div>
+                <h3 className="font-bold text-slate-800 text-sm">No Audit Trail Events Recorded</h3>
+                <p className="text-xs text-slate-500 max-w-sm mt-1 leading-relaxed">
+                  Real-time ledger events, payroll ingestions, and account balance modifications will appear here once processed.
+                </p>
               </div>
-            ))}
+            ) : (
+              auditLogs.map(log => (
+                <div key={log.id} className="p-4 rounded-2xl bg-slate-50 hover:bg-slate-100/80 transition border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3.5">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                      log.category === 'MCA' ? 'bg-teal-100 text-teal-800' :
+                      log.category === 'Bursary' ? 'bg-emerald-100 text-emerald-800' :
+                      log.category === 'Loans' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      <ShieldCheck size={18} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-black text-slate-900">{log.action}</p>
+                        <span className="px-1.5 py-0.5 bg-white border border-slate-200 text-slate-600 text-[9px] font-bold uppercase rounded">
+                          {log.category}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">{log.details}</p>
+                      <p className="text-[10px] text-slate-400 font-mono mt-1">Ref ID: {log.id} • Initiated by: {log.actor} ({log.role})</p>
+                    </div>
+                  </div>
+                  <div className="sm:text-right shrink-0">
+                    <span className="text-[10px] font-bold text-slate-400 block">{log.timestamp}</span>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded-full mt-1">
+                      <CheckCircle2 size={10} /> Certified
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}

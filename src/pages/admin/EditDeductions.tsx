@@ -84,17 +84,23 @@ export default function EditDeductions() {
       if (records.length === 0) {
         try {
           const snap = await getDocs(collection(db, 'users'));
-          const loaded: DeductionRecord[] = [];
+          const dedMap = new Map<string, DeductionRecord>();
           snap.forEach((dSnap) => {
             const d = dSnap.data();
+            if (d.isAlias) return;
             if (d.role === 'member' || !d.role) {
+              const rawId = d.id || d.memberId || dSnap.id;
+              const canonicalKey = String(rawId).trim().toUpperCase();
+              if (!canonicalKey) return;
+              const isExactDocMatch = dSnap.id.toUpperCase() === canonicalKey;
+
               const os = Number(d.ordinarySavingsMonthly || d.monthlyOrdinarySavings || 0);
               const ss = Number(d.specialSavingsMonthly || d.monthlySpecialSavings || 0);
               const inv = Number(d.investmentMonthly || 0);
               const cp = Number(d.commodityMonthly || 0);
               const loan = Number(d.loanMonthly || 0);
-              loaded.push({
-                id: dSnap.id,
+              const rec: DeductionRecord = {
+                id: String(rawId).trim(),
                 name: d.fullName || d.name || 'Member',
                 ordinarySavings: os,
                 specialSavings: ss,
@@ -102,11 +108,17 @@ export default function EditDeductions() {
                 commodityPurchase: cp,
                 loanReimbursement: loan,
                 total: os + ss + inv + cp + loan
-              });
+              };
+
+              if (!dedMap.has(canonicalKey)) {
+                dedMap.set(canonicalKey, rec);
+              } else if (isExactDocMatch) {
+                dedMap.set(canonicalKey, rec);
+              }
             }
           });
-          if (loaded.length > 0) {
-            setRecords(loaded);
+          if (dedMap.size > 0) {
+            setRecords(Array.from(dedMap.values()));
           }
         } catch (err) {
           console.warn('Could not fetch members for deduction roster:', err);
@@ -565,8 +577,8 @@ export default function EditDeductions() {
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-7 gap-4">
-                    <div className="space-y-1 col-span-2 sm:col-span-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3 sm:gap-4">
+                    <div className="space-y-1 sm:col-span-1 lg:col-span-1">
                       <label className="block text-[8px] text-slate-400 font-black uppercase">Staff ID</label>
                       <input 
                         type="text" 
@@ -578,7 +590,7 @@ export default function EditDeductions() {
                       />
                     </div>
 
-                    <div className="space-y-1 col-span-2">
+                    <div className="space-y-1 sm:col-span-2 md:col-span-2 lg:col-span-2">
                       <label className="block text-[8px] text-slate-400 font-black uppercase">Full Member Name</label>
                       <input 
                         type="text" 
@@ -658,7 +670,7 @@ export default function EditDeductions() {
 
           {/* Core spreadsheet editable live table */}
           <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[760px]">
               <thead>
                 <tr className="bg-slate-50/70 text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider sm:tracking-widest border-b border-slate-100">
                   <th className="px-3 sm:px-6 py-2.5 sm:py-4 w-28 sm:w-40">Staff ID</th>
@@ -681,12 +693,12 @@ export default function EditDeductions() {
                     </td>
                   </tr>
                 ) : (
-                  filteredRecords.map(record => {
+                  filteredRecords.map((record, rIdx) => {
                     const isEditing = editingId === record.id;
                     
                     return (
                       <tr 
-                        key={record.id} 
+                        key={`${record.id || 'ded'}-${rIdx}`} 
                         className={`hover:bg-slate-50/50 transition-colors ${
                           record.hasError ? 'bg-rose-50/10 border-l-4 border-l-rose-500' : ''
                         }`}
@@ -808,7 +820,7 @@ export default function EditDeductions() {
                                 onChange={(e) => setEditFormData(prev => prev ? { ...prev, total: Number(e.target.value) } : null)}
                                 className="w-20 sm:w-24 bg-slate-50 border border-emerald-500 rounded-lg p-1 text-[10px] sm:text-xs focus:ring-1 focus:ring-primary text-slate-800 font-mono font-black select-none text-right"
                               />
-                              <span className="text-[8px] sm:text-[9px] text-[#10b981] block font-mono font-extrabold mt-0.5 sm:mt-1">
+                              <span className="text-[8px] sm:text-[9px] text-primary block font-mono font-extrabold mt-0.5 sm:mt-1">
                                 Calc: ₦{((editFormData?.ordinarySavings || 0) + (editFormData?.specialSavings || 0) + (editFormData?.investment || 0) + (editFormData?.commodityPurchase || 0) + (editFormData?.loanReimbursement || 0)).toLocaleString()}
                               </span>
                             </div>

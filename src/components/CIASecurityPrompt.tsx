@@ -45,10 +45,10 @@ export default function CIASecurityPrompt({
   const handleNavigate = () => {
     localStorage.setItem('zimco_cia_security_dismissed', 'true');
     localStorage.setItem(`zimco_cia_security_acknowledged_${memberId}`, 'true');
-    if (onNavigateToSettings) {
-      onNavigateToSettings();
-    } else if (onNavigateToProfile) {
+    if (onNavigateToProfile) {
       onNavigateToProfile();
+    } else if (onNavigateToSettings) {
+      onNavigateToSettings();
     } else if (onNavigateToSecurity) {
       onNavigateToSecurity();
     }
@@ -80,21 +80,18 @@ export default function CIASecurityPrompt({
               <div>
                 <div className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-wider mb-1.5">
                   <Lock size={11} />
-                  <span>Confidentiality • Integrity • Availability (CIA)</span>
+                  <span>Account Security</span>
                 </div>
                 <h3 className="font-headline text-xl sm:text-2xl font-black text-white tracking-tight">
-                  Important Security & Profile Update Notice
+                  Security Checkpoints
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl leading-relaxed">
-                  Welcome to your ZIMCO Cooperative portal! To guarantee your personal account confidentiality and data integrity, please review the four security checkpoints below.
-                </p>
               </div>
             </div>
 
             <button
               onClick={handleDismiss}
               className="self-end sm:self-start p-2 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition cursor-pointer"
-              title="Acknowledge and close modal"
+              title="Close"
             >
               <X size={18} />
             </button>
@@ -109,15 +106,15 @@ export default function CIASecurityPrompt({
                   <KeyRound size={18} />
                 </div>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400">Pillar 1: Confidentiality</span>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400">Password</span>
                 </div>
-                <h4 className="font-bold text-white text-sm mb-1.5">Reset Default Password</h4>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
-                  Replace your default surname password with a private password or 4-digit PIN so only you can view your savings, loan schedules, and dividend records.
+                <h4 className="font-bold text-white text-sm mb-1.5">Update Password</h4>
+                <p className="text-[11px] text-slate-300">
+                  Set a secure private password to protect your savings and records.
                 </p>
               </div>
               <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] font-bold text-emerald-300">
-                <span>{isDefaultPassword ? 'Action Advised' : 'Secured'}</span>
+                <span>{isDefaultPassword ? 'Update Needed' : 'Secured'}</span>
                 <Lock size={13} />
               </div>
             </div>
@@ -129,15 +126,15 @@ export default function CIASecurityPrompt({
                   <UserCheck size={18} />
                 </div>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-blue-400">Pillar 2: Integrity</span>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-blue-400">Profile</span>
                 </div>
-                <h4 className="font-bold text-white text-sm mb-1.5">Verify Personal Profile</h4>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
-                  Confirm your official department, staff number, Next of Kin, and residential details so bursary deduction allocations remain accurate and tamper-free.
+                <h4 className="font-bold text-white text-sm mb-1.5">Verify Details</h4>
+                <p className="text-[11px] text-slate-300">
+                  Ensure department, staff number, and Next of Kin are accurate.
                 </p>
               </div>
               <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] font-bold text-blue-300">
-                <span>Review Details</span>
+                <span>Review</span>
                 <FileCheck2 size={13} />
               </div>
             </div>
@@ -149,15 +146,15 @@ export default function CIASecurityPrompt({
                   <Smartphone size={18} />
                 </div>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">Pillar 3: Availability</span>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">Contact</span>
                 </div>
-                <h4 className="font-bold text-white text-sm mb-1.5">Register Recovery Channels</h4>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
-                  Add an active mobile phone number and personal email address to receive immediate SMS transaction alerts and maintain 24/7 passbook access.
+                <h4 className="font-bold text-white text-sm mb-1.5">Alert Channels</h4>
+                <p className="text-[11px] text-slate-300">
+                  Add an active phone number and email for instant notifications.
                 </p>
               </div>
               <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] font-bold text-amber-300">
-                <span>SMS & Email Alerts</span>
+                <span>Alerts</span>
                 <Smartphone size={13} />
               </div>
             </div>
@@ -169,15 +166,15 @@ export default function CIASecurityPrompt({
                   <Shield size={18} />
                 </div>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-purple-400">Pillar 4: Auditing</span>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-purple-400">Ledger</span>
                 </div>
-                <h4 className="font-bold text-white text-sm mb-1.5">Inspect Statements</h4>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
-                  Review your monthly payroll deductions and download official PDF statements to reconcile against your university payroll payslip.
+                <h4 className="font-bold text-white text-sm mb-1.5">Statements</h4>
+                <p className="text-[11px] text-slate-300">
+                  Review monthly payroll deductions and download statements.
                 </p>
               </div>
               <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] font-bold text-purple-300">
-                <span>Monthly Audit</span>
+                <span>Audit</span>
                 <CheckCircle2 size={13} />
               </div>
             </div>

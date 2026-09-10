@@ -15,16 +15,15 @@ export default function Footer() {
         <div className="space-y-4">
           <h5 className="font-body text-xs font-medium uppercase tracking-widest text-emerald-900">Quick Links</h5>
           <ul className="space-y-3">
-            <li><Link className="font-body text-xs font-medium uppercase tracking-widest text-slate-500 hover:text-emerald-600 transition-colors hover:translate-x-1 inline-block" to="/services">Investment Tiers</Link></li>
+            <li><Link className="font-body text-xs font-medium uppercase tracking-widest text-slate-500 hover:text-emerald-600 transition-colors hover:translate-x-1 inline-block" to="/services">Services</Link></li>
+            <li><Link className="font-body text-xs font-medium uppercase tracking-widest text-slate-500 hover:text-emerald-600 transition-colors hover:translate-x-1 inline-block" to="/contact">Contact & Support</Link></li>
             <li><Link className="font-body text-xs font-medium uppercase tracking-widest text-slate-500 hover:text-emerald-600 transition-colors hover:translate-x-1 inline-block" to="/faq">FAQ</Link></li>
-            <li><Link className="font-body text-xs font-medium uppercase tracking-widest text-slate-500 hover:text-emerald-600 transition-colors hover:translate-x-1 inline-block" to="/about">Our Board</Link></li>
           </ul>
         </div>
 
         <div className="space-y-4">
           <h5 className="font-body text-xs font-medium uppercase tracking-widest text-emerald-900">Legal</h5>
           <ul className="space-y-3">
-            <li><Link className="font-body text-xs font-medium uppercase tracking-widest text-slate-500 hover:text-emerald-600 transition-colors hover:translate-x-1 inline-block" to="/compliance">Regulatory Compliance</Link></li>
             <li><Link className="font-body text-xs font-medium uppercase tracking-widest text-slate-500 hover:text-emerald-600 transition-colors hover:translate-x-1 inline-block" to="/privacy">Privacy Policy</Link></li>
             <li><Link className="font-body text-xs font-medium uppercase tracking-widest text-slate-500 hover:text-emerald-600 transition-colors hover:translate-x-1 inline-block" to="/terms">Terms of Service</Link></li>
           </ul>

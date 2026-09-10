@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Download, 
   Printer, 
@@ -19,11 +19,14 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import zimcoLogo from '@/assets/images/zimco_logo_1780347665840.png';
+import { deriveDefaultPassword } from '../lib/deductionNormalizer';
 
 export interface NewMemberCredential {
   id: string; // Zimco ID
   name: string; // Full Name
-  surname: string; // Default password
+  defaultPassword?: string;
+  firstName?: string;
+  surname?: string;
   email?: string;
   initialDeduction: number;
   ordinarySavings?: number;
@@ -59,10 +62,28 @@ export default function NewMembersCredentialModal({
 
   if (!isOpen) return null;
 
-  const filteredMembers = newMembers.filter(m => {
+  const getMemberDefaultPassword = (m: NewMemberCredential) => {
+    return m.defaultPassword || deriveDefaultPassword(m.id);
+  };
+
+  const uniqueNewMembers = useMemo(() => {
+    const seen = new Set<string>();
+    const list: NewMemberCredential[] = [];
+    newMembers.forEach(m => {
+      const key = (m.id || m.name).toUpperCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        list.push(m);
+      }
+    });
+    return list;
+  }, [newMembers]);
+
+  const filteredMembers = uniqueNewMembers.filter(m => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
-    return m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q) || m.surname.toLowerCase().includes(q);
+    const pass = getMemberDefaultPassword(m);
+    return m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q) || (m.surname && m.surname.toLowerCase().includes(q)) || pass.includes(q);
   });
 
   const totalDeductions = newMembers.reduce((acc, curr) => acc + (curr.initialDeduction || 0), 0);
@@ -74,7 +95,8 @@ export default function NewMembersCredentialModal({
     const headers = [
       'ZIMCO ID',
       'Full Name',
-      'Default Password (Surname)',
+      'Default Password (ID-Based)',
+      'Surname',
       'Initial Deduction (NGN)',
       'Cycle Period',
       'Login Portal URL',
@@ -84,11 +106,12 @@ export default function NewMembersCredentialModal({
     const rows = newMembers.map(m => [
       `"${m.id}"`,
       `"${m.name.replace(/"/g, '""')}"`,
-      `"${m.surname}"`,
+      `"${getMemberDefaultPassword(m)}"`,
+      `"${m.surname || ''}"`,
       `"${m.initialDeduction}"`,
       `"${activeMonth}"`,
       `"https://zimco.org/login/member"`,
-      `"Enter Zimco ID & Surname in lowercase. Prompted to change password on 1st login."`
+      `"Enter Zimco ID & default password (${getMemberDefaultPassword(m)}). Complete profile on dashboard."`
     ]);
 
     const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -96,17 +119,18 @@ export default function NewMembersCredentialModal({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `zimco_new_members_credentials_${activeMonth.toLowerCase().replace(/\s+/g, '_')}.csv`);
+    link.setAttribute('download', `zimco_member_credentials_${activeMonth.toLowerCase().replace(/\s+/g, '_')}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast(`Downloaded login credentials roster for ${newMembers.length} new members!`, 'success');
+    showToast(`Downloaded login credentials roster for ${newMembers.length} members!`, 'success');
   };
 
   // Copy single credential
   const handleCopySingle = (member: NewMemberCredential) => {
-    const text = `ZIMCO Member Login Credentials:\nName: ${member.name}\nZimco ID: ${member.id}\nDefault Password: ${member.surname}\nLogin URL: https://zimco.org/login/member`;
+    const pass = getMemberDefaultPassword(member);
+    const text = `ZIMCO Member Login Credentials:\nName: ${member.name}\nZimco ID: ${member.id}\nDefault Password (ID-Based): ${pass}\nLogin URL: https://zimco.org/login/member`;
     navigator.clipboard.writeText(text);
     setCopiedId(member.id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -118,19 +142,20 @@ export default function NewMembersCredentialModal({
     if (newMembers.length === 0) return;
 
     let text = `====================================================\n`;
-    text += `ZIMCO COOPERATIVE - NEW MEMBERS LOGIN CREDENTIALS\n`;
-    text += `Cycle: ${activeMonth} | Total New Accounts: ${newMembers.length}\n`;
+    text += `ZIMCO COOPERATIVE - MEMBER LOGIN CREDENTIALS ROSTER\n`;
+    text += `Cycle: ${activeMonth} | Total Accounts: ${newMembers.length}\n`;
     text += `Login Portal: https://zimco.org/login/member\n`;
     text += `====================================================\n\n`;
 
     newMembers.forEach((m, idx) => {
+      const pass = getMemberDefaultPassword(m);
       text += `${idx + 1}. ${m.name}\n`;
       text += `   Zimco ID: ${m.id}\n`;
-      text += `   Default Password: ${m.surname}\n`;
+      text += `   Default Password (ID-Based): ${pass}\n`;
       text += `   Initial Deduction: ₦${m.initialDeduction.toLocaleString()}\n\n`;
     });
 
-    text += `Note: Members should log in with their Zimco ID and Surname in lowercase, then set their permanent password.`;
+    text += `Note: Members log in with their Zimco ID and their default password (e.g. ${getMemberDefaultPassword(newMembers[0])}), then complete their profile on the dashboard.`;
 
     navigator.clipboard.writeText(text);
     setCopiedAll(true);
@@ -162,17 +187,17 @@ export default function NewMembersCredentialModal({
             <div>
               <div className="flex items-center gap-2">
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-400/20 text-emerald-300 border border-emerald-400/30">
-                  New Member Accounts Generated
+                  Member Accounts Ready
                 </span>
                 <span className="text-xs text-emerald-200/80 font-medium">
                   {activeMonth}
                 </span>
               </div>
               <h2 className="text-2xl font-black tracking-tight mt-1">
-                New Members Login Credentials Roster
+                Member Login Credentials Roster
               </h2>
               <p className="text-xs text-emerald-100/80 mt-1 max-w-2xl leading-relaxed">
-                The members below were not previously registered in the cooperative database. Their accounts have been created with their <strong>Zimco ID</strong> and their <strong>surname</strong> as the default initial password.
+                Accounts are provisioned with their <strong>ZIMCO ID</strong> and an ID-derived default credential (<code>zimco#&lt;id&gt;</code>) to eliminate surname/name collisions.
               </p>
             </div>
           </div>
@@ -189,30 +214,30 @@ export default function NewMembersCredentialModal({
         {/* Highlight Stats Bar */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 sm:p-6 bg-slate-50 border-b border-slate-200 shrink-0">
           <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">New Members</span>
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Total Accounts</span>
             <div className="text-xl font-black text-emerald-700 mt-0.5">{newMembers.length}</div>
-            <span className="text-[10px] text-slate-500 font-medium">Auto-assigned Zimco IDs</span>
+            <span className="text-[10px] text-slate-500 font-medium">Assigned Zimco IDs</span>
           </div>
 
           <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm">
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Total Deductions</span>
             <div className="text-xl font-black text-slate-800 mt-0.5">₦{totalDeductions.toLocaleString()}</div>
-            <span className="text-[10px] text-slate-500 font-medium">Initial ledger injection</span>
+            <span className="text-[10px] text-slate-500 font-medium">Ledger Disbursed</span>
           </div>
 
           <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm">
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Default Password</span>
-            <div className="text-sm font-black text-amber-700 mt-1 flex items-center gap-1">
-              <Key size={14} className="text-amber-600" />
-              <span>Surname (lowercase)</span>
+            <div className="text-sm font-black text-emerald-700 mt-1 flex items-center gap-1">
+              <Key size={14} className="text-emerald-600" />
+              <span>First Name (lowercase)</span>
             </div>
-            <span className="text-[10px] text-slate-500 font-medium">e.g. "adewale", "musa"</span>
+            <span className="text-[10px] text-slate-500 font-medium">e.g. "sharafat", "abdulhameed"</span>
           </div>
 
           <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Login Portal URL</span>
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Member Portal</span>
             <div className="text-xs font-mono font-bold text-slate-700 mt-1 truncate">/login/member</div>
-            <span className="text-[10px] text-emerald-600 font-bold">First login prompts reset</span>
+            <span className="text-[10px] text-emerald-600 font-bold">First login prompts profile update</span>
           </div>
         </div>
 
@@ -306,7 +331,7 @@ export default function NewMembersCredentialModal({
                     <th className="px-4 py-3">#</th>
                     <th className="px-4 py-3">ZIMCO ID</th>
                     <th className="px-4 py-3">Full Name</th>
-                    <th className="px-4 py-3">Default Password (Surname)</th>
+                    <th className="px-4 py-3">Default Password (ID-Based)</th>
                     <th className="px-4 py-3 text-right">Initial Deduction</th>
                     <th className="px-4 py-3 text-center">Status</th>
                     <th className="px-4 py-3 text-right">Action</th>
@@ -314,7 +339,7 @@ export default function NewMembersCredentialModal({
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
                   {filteredMembers.map((member, idx) => (
-                    <tr key={member.id} className="hover:bg-slate-50/70 transition-colors">
+                    <tr key={`${member.id || 'mem'}-${idx}`} className="hover:bg-slate-50/70 transition-colors">
                       <td className="px-4 py-3 text-slate-400 font-mono font-medium">{idx + 1}</td>
                       <td className="px-4 py-3">
                         <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">
@@ -328,10 +353,10 @@ export default function NewMembersCredentialModal({
                         <div className="flex items-center gap-1.5 font-mono text-xs">
                           <span className={`px-2 py-0.5 rounded-md font-semibold ${
                             showPasswords 
-                              ? 'bg-amber-50 text-amber-900 border border-amber-200' 
+                              ? 'bg-emerald-50 text-emerald-900 border border-emerald-200 font-bold' 
                               : 'bg-slate-100 text-slate-600'
                           }`}>
-                            {showPasswords ? member.surname : '••••••••'}
+                            {showPasswords ? getMemberDefaultPassword(member) : '••••••••'}
                           </span>
                         </div>
                       </td>
@@ -363,12 +388,12 @@ export default function NewMembersCredentialModal({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {filteredMembers.map((member, idx) => (
                 <div 
-                  key={member.id}
+                  key={`${member.id || 'slip'}-${idx}`}
                   className="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-5 relative overflow-hidden shadow-sm page-break-inside-avoid"
                 >
                   <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-3">
                     <div className="flex items-center gap-2">
-                      <img src={zimcoLogo} alt="ZIMCO Logo" className="w-7 h-7 object-contain" />
+                      <img src={zimcoLogo} alt="ZIMCO Logo" className="w-7 h-7 object-contain" referrerPolicy="no-referrer" />
                       <div>
                         <h4 className="font-black text-xs text-slate-900 tracking-tight">ZIMCO COOPERATIVE</h4>
                         <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-wider">Member Access Slip</span>
@@ -389,13 +414,13 @@ export default function NewMembersCredentialModal({
                         <p className="font-mono font-bold text-emerald-800 text-xs">{member.id}</p>
                       </div>
                       <div>
-                        <span className="text-[9px] font-extrabold uppercase text-slate-400 block">Default Password</span>
-                        <p className="font-mono font-bold text-amber-800 text-xs">{member.surname}</p>
+                        <span className="text-[9px] font-extrabold uppercase text-slate-400 block">Default Password (ID-Based)</span>
+                        <p className="font-mono font-bold text-emerald-800 text-xs">{getMemberDefaultPassword(member)}</p>
                       </div>
                     </div>
 
                     <div className="text-[10px] text-slate-500 bg-emerald-50/50 p-2 rounded-lg border border-emerald-100 leading-snug">
-                      <strong>How to Access:</strong> Visit <em>https://zimco.org/login/member</em>. Enter your Zimco ID and your Surname in lowercase. You will be prompted to set your new personal password on first login.
+                      <strong>How to Access:</strong> Visit <em>https://zimco.org/login/member</em>. Enter your Zimco ID and your initial password (e.g. <em>{getMemberDefaultPassword(member)}</em>). You will be prompted to complete your member profile upon your first login.
                     </div>
                   </div>
                 </div>

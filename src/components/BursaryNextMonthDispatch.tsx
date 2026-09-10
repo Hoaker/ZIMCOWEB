@@ -687,7 +687,7 @@ export default function BursaryNextMonthDispatch({
 
         {/* Schedule Table */}
         <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse min-w-[1100px]">
             <thead>
               <tr className="bg-slate-50/80 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                 <th className="p-3.5 w-12 text-center">S/N</th>
@@ -704,8 +704,8 @@ export default function BursaryNextMonthDispatch({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
-              {displayRows.map((row) => (
-                <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
+              {displayRows.map((row, rIdx) => (
+                <tr key={`${row.id || 'disp'}-${rIdx}`} className="hover:bg-slate-50/80 transition-colors">
                   <td className="p-3.5 text-center text-slate-400 font-mono text-[10px]">{row.sn}</td>
                   <td className="p-3.5 font-mono font-bold text-emerald-900">{row.id}</td>
                   <td className="p-3.5">

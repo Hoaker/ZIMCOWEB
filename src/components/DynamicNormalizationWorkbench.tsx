@@ -52,13 +52,14 @@ import {
   parseSpreadsheetBuffer,
   evaluateHeaderConformance,
   exportBursaryNextMonthAdjustmentSchedule,
-  exportProcessedDeductionsSpreadsheet
+  exportProcessedDeductionsSpreadsheet,
+  detectMonthFromSheetNameOrText
 } from '../lib/deductionNormalizer';
 
 interface DynamicNormalizationWorkbenchProps {
   parsedSheet: ParsedRawSheet;
   ceilings: { ordinarySavingsCeiling: number; specialSavingsCeiling: number };
-  onNormalizedComplete: (normalizedRecords: NormalizedDeductionRecord[]) => void;
+  onNormalizedComplete: (normalizedRecords: NormalizedDeductionRecord[], specifiedMonth?: string) => void;
   onCancel: () => void;
   showToast: (message: string, type?: 'success' | 'warning' | 'error' | 'info') => void;
 }
@@ -93,6 +94,11 @@ export default function DynamicNormalizationWorkbench({
   // Track row-level overrides and modifications
   const [modifiedCellKeys, setModifiedCellKeys] = useState<Set<string>>(new Set());
 
+  // Billing month specified for current sheet
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    return initialParsedSheet.suggestedMonth || detectMonthFromSheetNameOrText(initialParsedSheet.sheetName, 'January 2026');
+  });
+
   // Synchronize internal state whenever initialParsedSheet prop updates
   useEffect(() => {
     setCurrentParsedSheet(initialParsedSheet);
@@ -100,6 +106,8 @@ export default function DynamicNormalizationWorkbench({
     setMappings(initialParsedSheet.columnMappings);
     setSanitizedRows(initialParsedSheet.rawRows.map(row => ({ ...row })));
     setModifiedCellKeys(new Set());
+    const detected = initialParsedSheet.suggestedMonth || detectMonthFromSheetNameOrText(initialParsedSheet.sheetName, 'January 2026');
+    setSelectedMonth(detected);
   }, [initialParsedSheet]);
 
   // Handle Sheet Tab Switch for multi-sheet workbooks
@@ -118,13 +126,17 @@ export default function DynamicNormalizationWorkbench({
         setMappings(newParsed.columnMappings);
         setSanitizedRows(newParsed.rawRows.map(r => ({ ...r })));
         setModifiedCellKeys(new Set());
-        showToast(`Switched to sheet "${targetSheet}". Loaded ${newParsed.rawRows.length} records.`, 'success');
+        const autoMonth = newParsed.suggestedMonth || detectMonthFromSheetNameOrText(newParsed.sheetName, selectedMonth);
+        setSelectedMonth(autoMonth);
+        showToast(`Switched to sheet "${targetSheet}". Inferred billing cycle: ${autoMonth}. Loaded ${newParsed.rawRows.length} records.`, 'success');
       } catch (err: any) {
         showToast(`Could not load sheet "${targetSheet}": ${err.message}`, 'error');
       }
     } else {
       setActiveSheetName(targetSheet);
-      showToast(`Selected sheet tab: "${targetSheet}"`, 'info');
+      const autoMonth = detectMonthFromSheetNameOrText(targetSheet, selectedMonth);
+      setSelectedMonth(autoMonth);
+      showToast(`Selected sheet tab: "${targetSheet}" (${autoMonth})`, 'info');
     }
   };
 
@@ -516,8 +528,8 @@ export default function DynamicNormalizationWorkbench({
         throw new Error('No valid member records could be constructed from the sanitized dataset.');
       }
 
-      showToast(`Data Sanitization Complete! Prepared ${normalized.length} records ready for member accounts.`, 'success');
-      onNormalizedComplete(normalized);
+      showToast(`Data Sanitization Complete for ${selectedMonth}! Prepared ${normalized.length} records ready for member accounts.`, 'success');
+      onNormalizedComplete(normalized, selectedMonth);
     } catch (err: any) {
       console.error('Commit error:', err);
       showToast(`Commit Error: ${err.message}`, 'error');
@@ -542,8 +554,8 @@ export default function DynamicNormalizationWorkbench({
 
     try {
       const normalized = normalizeRawRows(sanitizedRows, updatedMappings, ceilings);
-      showToast(`Excluded all non-ledger columns and injected ${normalized.length} records!`, 'success');
-      onNormalizedComplete(normalized);
+      showToast(`Excluded all non-ledger columns and injected ${normalized.length} records for ${selectedMonth}!`, 'success');
+      onNormalizedComplete(normalized, selectedMonth);
     } catch (err: any) {
       showToast(`Error: ${err.message}`, 'error');
     }
@@ -677,6 +689,73 @@ export default function DynamicNormalizationWorkbench({
             </div>
           </div>
         )}
+
+        {/* SPECIFY BILLING MONTH FOR CURRENT SHEET */}
+        <div className="mt-4 p-4 sm:p-5 bg-gradient-to-r from-emerald-50 via-teal-50/70 to-slate-50 border border-emerald-200/90 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center shrink-0 font-bold shadow-xs">
+              <Calendar size={20} />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-800">
+                  Target Billing Month for Sheet: <span className="text-emerald-800 font-mono font-black underline decoration-emerald-400 decoration-2 underline-offset-2">"{activeSheetName}"</span>
+                </span>
+                <span className="text-[10px] bg-emerald-100/90 text-emerald-800 font-extrabold px-2.5 py-0.5 rounded-full border border-emerald-300/60">
+                  Direct Cooperator Passbook Sync
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                Specify which month this sheet applies to. When pushed, members will see this exact month's statement and itemized deductions in their personal dashboard.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* Month Dropdown */}
+            <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-300 shadow-xs focus-within:ring-2 focus-within:ring-emerald-500/30 focus-within:border-emerald-500">
+              <span className="text-[10px] font-black uppercase text-slate-400">Month:</span>
+              <select
+                value={selectedMonth.split(' ')[0] || 'January'}
+                onChange={(e) => {
+                  const m = e.target.value;
+                  const y = selectedMonth.split(' ')[1] || '2026';
+                  setSelectedMonth(`${m} ${y}`);
+                }}
+                className="text-xs font-black text-slate-800 bg-transparent focus:outline-none cursor-pointer"
+              >
+                {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Year Dropdown */}
+            <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-300 shadow-xs focus-within:ring-2 focus-within:ring-emerald-500/30 focus-within:border-emerald-500">
+              <span className="text-[10px] font-black uppercase text-slate-400">Year:</span>
+              <select
+                value={selectedMonth.split(' ')[1] || '2026'}
+                onChange={(e) => {
+                  const y = e.target.value;
+                  const m = selectedMonth.split(' ')[0] || 'January';
+                  setSelectedMonth(`${m} ${y}`);
+                }}
+                className="text-xs font-black text-slate-800 bg-transparent focus:outline-none cursor-pointer"
+              >
+                {['2024', '2025', '2026', '2027', '2028'].map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Current Selected Cycle Badge */}
+            <div className="px-3.5 py-1.5 rounded-xl bg-slate-900 text-emerald-400 text-xs font-black shadow-xs flex items-center gap-1.5 border border-slate-800">
+              <Check size={13} className="text-emerald-400 stroke-[3]" />
+              <span className="text-white font-medium">Assigned:</span>
+              <span className="font-mono text-emerald-400 font-black">{selectedMonth}</span>
+            </div>
+          </div>
+        </div>
 
         {/* Account Split Aggregate Summary Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 pt-6 pb-2">
@@ -931,7 +1010,7 @@ export default function DynamicNormalizationWorkbench({
 
           {/* Sanitization Spreadsheet Table */}
           <div className="overflow-x-auto max-h-[600px] custom-scrollbar rounded-xl border border-slate-200 shadow-inner">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-xs min-w-[1200px]">
               <thead>
                 <tr className="bg-slate-100/90 border-b border-slate-200 text-[10px] font-bold text-slate-700 uppercase tracking-wider sticky top-0 z-10 backdrop-blur-md">
                   <th className="p-3 w-10 text-center">#</th>
@@ -1587,7 +1666,7 @@ export default function DynamicNormalizationWorkbench({
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
+              <table className="w-full text-left border-collapse text-xs min-w-[850px]">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                     <th className="p-3">#</th>
@@ -1676,7 +1755,7 @@ export default function DynamicNormalizationWorkbench({
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-xs min-w-[900px]">
               <thead>
                 <tr className="bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-600 uppercase tracking-wider">
                   <th className="p-3">#</th>

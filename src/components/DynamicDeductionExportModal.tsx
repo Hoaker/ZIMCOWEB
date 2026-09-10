@@ -98,20 +98,20 @@ export default function DynamicDeductionExportModal({
     return members.map(m => {
       const breakdown = m.lastDeductionBreakdown;
 
-      // Extract specific monthly deduction values (breakdown or active balance baseline)
-      const os = breakdown?.ordinarySavings !== undefined ? breakdown.ordinarySavings : (m.ordinarySavings > 50000 ? Math.round(m.ordinarySavings * 0.1) : (m.ordinarySavings || 25000));
-      const ss = breakdown?.specialSavings !== undefined ? breakdown.specialSavings : (m.specialSavings > 20000 ? Math.round(m.specialSavings * 0.1) : (m.specialSavings || 10000));
-      const inv = breakdown?.investment !== undefined ? breakdown.investment : (m.investmentAmount ? Math.min(50000, Math.round(m.investmentAmount * 0.1)) : 0);
-      const lr = breakdown?.loanReimbursement !== undefined ? breakdown.loanReimbursement : (m.outstandingLoans ? Math.min(60000, Math.round(m.outstandingLoans * 0.15)) : 0);
-      const cp = breakdown?.commodityPurchase !== undefined ? breakdown.commodityPurchase : (m.commoditySavings ? Math.min(30000, Math.round(m.commoditySavings * 0.2)) : 0);
-      const mc = breakdown?.muslimCommunity !== undefined ? breakdown.muslimCommunity : (m.muslimCommunitySavings ? Math.min(25000, Math.round(m.muslimCommunitySavings * 0.1)) : 0);
+      // Extract specific monthly deduction values (breakdown or actual member balance)
+      const os = breakdown?.ordinarySavings !== undefined ? breakdown.ordinarySavings : Number(m.ordinarySavings || 0);
+      const ss = breakdown?.specialSavings !== undefined ? breakdown.specialSavings : Number(m.specialSavings || 0);
+      const inv = breakdown?.investment !== undefined ? breakdown.investment : Number(m.investmentAmount || 0);
+      const lr = breakdown?.loanReimbursement !== undefined ? breakdown.loanReimbursement : Number(m.outstandingLoans || 0);
+      const cp = breakdown?.commodityPurchase !== undefined ? breakdown.commodityPurchase : Number(m.commoditySavings || 0);
+      const mc = breakdown?.muslimCommunity !== undefined ? breakdown.muslimCommunity : Number(m.muslimCommunitySavings || 0);
       
       const total = os + ss + inv + lr + cp + mc;
 
       return {
         id: m.id,
         name: m.fullName,
-        department: m.department || 'General',
+        department: m.department || '',
         date: m.lastDeductionDate ? m.lastDeductionDate.split('T')[0] : effectiveDate,
         ordinarySavings: os,
         specialSavings: ss,
@@ -231,21 +231,21 @@ export default function DynamicDeductionExportModal({
         className="bg-white rounded-[2rem] shadow-2xl border border-slate-100 w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh] my-auto"
       >
         {/* Modal Top Header */}
-        <div className="px-6 sm:px-8 py-5 bg-[#091e14] text-white flex items-center justify-between border-b border-[#143224] shrink-0">
+        <div className="px-6 sm:px-8 py-5 bg-surface-container text-on-surface flex items-center justify-between border-b border-outline-variant shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <div className="w-10 h-10 rounded-2xl bg-primary-container text-on-primary-container flex items-center justify-center">
               <FileSpreadsheet size={20} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-black tracking-tight text-white font-headline">
+                <h2 className="text-base sm:text-lg font-black tracking-tight text-on-surface font-headline">
                   Dynamic Deduction Data Export
                 </h2>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9px] font-black uppercase tracking-wider">
+                <span className="px-2 py-0.5 rounded-full bg-primary-container text-on-primary-container text-[9px] font-black uppercase tracking-wider font-label">
                   Excel (.xlsx)
                 </span>
               </div>
-              <p className="text-xs text-slate-300 mt-0.5">
+              <p className="text-xs text-on-surface-variant mt-0.5">
                 Generate standard-compliant Excel workbooks matching the canonical 10-column input format.
               </p>
             </div>
@@ -435,8 +435,8 @@ export default function DynamicDeductionExportModal({
                           </td>
                         </tr>
                       ) : (
-                        filteredItems.map(item => (
-                          <tr key={item.id} className="hover:bg-slate-50 transition">
+                        filteredItems.map((item, idx) => (
+                          <tr key={`${item.id || 'exp'}-${idx}`} className="hover:bg-slate-50 transition">
                             <td className="p-2.5 text-slate-500">{item.date}</td>
                             <td className="p-2.5 font-bold text-slate-800">{item.id}</td>
                             <td className="p-2.5 font-sans font-extrabold text-slate-900">{item.name}</td>

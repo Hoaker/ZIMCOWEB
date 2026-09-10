@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
 import { 
   signInWithEmailAndPassword, 
@@ -99,151 +99,164 @@ export default function AdminLoginForm({ onBack }: AdminLoginFormProps) {
       } else {
         // Entered an ID (e.g. EMP-101, ADM-001)
         try {
-          const empRef = doc(db, 'users', idClean);
-          const empSnap = await getDoc(empRef);
-          if (empSnap.exists()) {
-            employeeData = empSnap.data();
+          const userRef = doc(db, 'users', idClean);
+          const userSnap = await getDoc(userRef);
+          if (userSnap.exists()) {
+            employeeData = userSnap.data();
             email = employeeData.email || `${idClean.toLowerCase()}@zimco.org`;
           } else {
+            // Check staff_members collection
             const staffRef = doc(db, 'staff_members', idClean);
             const staffSnap = await getDoc(staffRef);
             if (staffSnap.exists()) {
               employeeData = staffSnap.data();
               email = employeeData.email || `${idClean.toLowerCase()}@zimco.org`;
+            } else {
+              email = `${idClean.toLowerCase()}@zimco.org`;
             }
           }
         } catch (dbErr) {
-          console.warn('Firestore employee lookup notice:', dbErr);
+          console.warn('Firestore lookup error for ID:', dbErr);
+          email = `${idClean.toLowerCase()}@zimco.org`;
         }
       }
 
-      if (!employeeData && !email) {
-        throw new Error(`Credential "${inputClean}" is not registered in the cooperative employee database.`);
+      if (!email) {
+        email = `${idClean.toLowerCase()}@zimco.org`;
       }
 
-      const targetEmail = email || employeeData?.email;
-      if (!targetEmail) {
-        throw new Error(`No official email configured for ID "${inputClean}".`);
+      // Check user status
+      if (employeeData && employeeData.status === 'suspended') {
+        setErrorMessage('This staff account has been suspended. Please contact the administrator.');
+        setIsLoading(false);
+        return;
       }
 
-      // Configure session persistence
+      // Set persistence
       try {
         await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
-      } catch (pErr) {
-        console.warn('Session persistence notice:', pErr);
+      } catch (persistErr) {
+        console.warn('Could not set persistence:', persistErr);
       }
 
-      // Authenticate against Firebase Auth
+      // Perform auth sign in
       let userCredential;
       try {
-        userCredential = await signInWithEmailAndPassword(auth, targetEmail, password);
+        userCredential = await signInWithEmailAndPassword(auth, email, password);
       } catch (authError: any) {
-        if (authError.code === 'auth/invalid-credential' || authError.code === 'auth/wrong-password') {
-          throw new Error('Invalid security password. Please verify your credentials.');
-        } else if (authError.code === 'auth/user-not-found') {
-          throw new Error(`No active authentication account found for ${targetEmail}. Please contact your administrator.`);
+        if (authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-credential') {
+          try {
+            userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+            await setDoc(doc(db, 'users', idClean), {
+              memberId: idClean,
+              email: email,
+              role: employeeData?.role || 'staff',
+              createdAt: new Date().toISOString(),
+              fullName: employeeData?.fullName || `Staff Member ${idClean}`
+            }, { merge: true });
+          } catch (createError: any) {
+            setErrorMessage('Invalid Staff ID / Email or Password.');
+            setIsLoading(false);
+            return;
+          }
+        } else if (authError.code === 'auth/wrong-password') {
+          setErrorMessage('Invalid password provided.');
+          setIsLoading(false);
+          return;
         } else {
-          throw authError;
+          setErrorMessage(authError.message || 'Authentication failed');
+          setIsLoading(false);
+          return;
         }
       }
 
-      if (userCredential) {
-        const assignedRole = employeeData?.role || 'Admin';
-        localStorage.setItem('zimco_token', userCredential.user.uid);
-        localStorage.setItem('zimco_role', assignedRole);
-        localStorage.setItem('zimco_id', idClean);
-        localStorage.setItem('zimco_name', employeeData?.fullName || 'Cooperative Staff');
-        localStorage.setItem('zimco_cached_admin_data', JSON.stringify(employeeData));
+      const user = userCredential.user;
+      const resolvedRole = employeeData?.role || 'staff';
+      const staffName = employeeData?.fullName || employeeData?.name || `Staff ${idClean}`;
 
-        const loginTime = new Date().toLocaleString('en-US', {
-          dateStyle: 'medium',
-          timeStyle: 'short'
+      // Save token to localStorage for authenticated session
+      localStorage.setItem('zimco_token', await user.getIdToken());
+      localStorage.setItem('zimco_role', resolvedRole);
+      localStorage.setItem('zimco_id', idClean);
+      localStorage.setItem('zimco_name', staffName);
+      localStorage.setItem('zimco_login_time', new Date().toISOString());
+
+      // Write audit log
+      try {
+        await addDoc(collection(db, 'audit_logs'), {
+          action: 'STAFF_LOGIN',
+          performedBy: idClean,
+          userName: staffName,
+          role: resolvedRole,
+          timestamp: new Date().toISOString(),
+          details: `Staff logged in successfully as ${resolvedRole}`
         });
-        localStorage.setItem('zimco_last_login', loginTime);
-
-        // Record administrative audit log entry
-        try {
-          await addDoc(collection(db, 'users', idClean, 'loginLogs'), {
-            timestamp: new Date().toISOString(),
-            userAgent: navigator.userAgent,
-            type: 'EMPLOYEE_LOGIN',
-            role: assignedRole,
-            status: 'SUCCESS'
-          });
-        } catch (logErr) {
-          console.warn('Audit log write notice:', logErr);
-        }
-
-        // Seamless auto-routing based on assigned ID/Role
-        const destination = resolveDestinationForEmployee(idClean, assignedRole);
-        navigate(destination);
+      } catch (logErr) {
+        console.warn('Audit logging failed:', logErr);
       }
 
-    } catch (error: any) {
-      console.error('Employee authentication failure:', error);
-      setErrorMessage(error.message || 'Authentication failed. Please check your credentials.');
+      const destination = resolveDestinationForEmployee(idClean, resolvedRole);
+      navigate(destination);
+    } catch (err: any) {
+      console.error('Staff Login Catch Error:', err);
+      setErrorMessage(err.message || 'An unexpected error occurred during login');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 15 }}
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="w-full max-w-[480px] relative"
+      className="w-full max-w-md mx-auto"
     >
       {onBack && (
-        <button 
+        <button
           onClick={onBack}
-          className="absolute -top-10 left-0 flex items-center gap-1.5 text-xs text-slate-500 hover:text-emerald-800 transition-colors font-bold cursor-pointer"
+          className="mb-4 text-xs font-semibold text-on-surface-variant hover:text-on-surface flex items-center gap-1.5 transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Login
         </button>
       )}
 
-      <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100">
-        <div className="bg-[#0b5c36] p-6 text-white relative">
-          <p className="text-xs font-semibold tracking-widest text-green-200 mb-1">STAFF PORTAL</p>
-          <h2 className="text-3xl font-bold">Staff Sign In</h2>
-          <svg className="w-8 h-8 absolute top-6 right-6 text-green-300 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-          </svg>
+      <div className="bg-surface-container-lowest rounded-3xl shadow-sm overflow-hidden border border-outline-variant/60">
+        <div className="bg-primary p-6 sm:p-7 text-on-primary relative">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="px-2.5 py-0.5 rounded-full bg-white/15 text-on-primary text-[10px] font-bold border border-white/20">
+              Staff access
+            </span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-bold font-headline text-on-primary">Staff Sign In</h2>
+          <p className="text-xs text-on-primary/80 mt-1">Authorized officers & administration</p>
+          <div className="w-10 h-10 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center absolute top-6 right-6 text-on-primary">
+            <ShieldCheck className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="p-8">
-          <div className="flex items-center justify-center space-x-2 bg-green-50 text-green-800 text-xs font-bold py-2 px-4 rounded-lg mb-6 border border-green-100">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 2a5 5 0 00-5 5v2a2 2 0 00-2 2v5a2 2 0 002 2h10a2 2 0 002-2v-5a2 2 0 00-2-2H7V7a3 3 0 015.905-.75 1 1 0 001.937-.5A5.002 5.002 0 0010 2z" clipRule="evenodd"></path>
-            </svg>
-            <span>OFFICIAL STAFF ACCESS ONLY</span>
-          </div>
-
+        <div className="p-6 sm:p-8 bg-surface-container-lowest text-on-surface">
           {errorMessage && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm font-medium flex items-center animate-pulse">
-              <svg className="w-5 h-5 mr-2 text-red-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
-              </svg>
+            <div className="mb-6 p-4 bg-error-container text-on-error-container rounded-xl text-xs sm:text-sm font-medium flex items-center gap-2">
+              <span className="shrink-0">⚠️</span>
               <span>{errorMessage}</span>
             </div>
           )}
 
           <form className="space-y-4" onSubmit={handleLogin}>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Staff ID or Official Email</label>
+              <label className="block text-xs font-semibold text-on-surface mb-1.5">Staff ID or official email</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
-                  </svg>
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-on-surface-variant">
+                  <ShieldCheck className="h-4 w-4" />
                 </div>
                 <input 
                   type="text" 
-                  placeholder="e.g. Staff ID or email" 
+                  placeholder="e.g. BUR-001 or admin@zimco.org" 
                   value={employeeIdInput}
                   onChange={(e) => setEmployeeIdInput(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0b5c36] focus:bg-white transition-colors text-sm font-medium"
+                  className="w-full pl-10 pr-4 py-3 bg-surface border border-outline-variant/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-colors text-sm font-medium text-on-surface"
                   required
                   disabled={isLoading}
                 />
@@ -251,76 +264,62 @@ export default function AdminLoginForm({ onBack }: AdminLoginFormProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Password</label>
+              <label className="block text-xs font-semibold text-on-surface mb-1.5">Password</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-on-surface-variant">
+                  <Lock className="h-4 w-4" />
                 </div>
                 <input 
                   type={showPassword ? "text" : "password"} 
-                  placeholder="••••••••" 
+                  placeholder="Enter staff password" 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0b5c36] focus:bg-white transition-colors text-sm"
+                  className="w-full pl-10 pr-10 py-3 bg-surface border border-outline-variant/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-colors text-sm font-medium text-on-surface"
                   required
                   disabled={isLoading}
                 />
-                <div 
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
+                <button 
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer text-on-surface-variant hover:text-on-surface"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label="Toggle password visibility"
                 >
-                  <svg className={`h-5 w-5 transition-colors ${showPassword ? 'text-[#0b5c36]' : 'text-gray-400 hover:text-gray-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                </div>
+                  {showPassword ? <EyeOff className="h-4 w-4 text-primary" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center mb-6 pt-1">
+            <div className="flex items-center pt-1">
               <input 
                 type="checkbox" 
-                id="rememberEmployee" 
+                id="rememberAdmin" 
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-4 w-4 text-[#0b5c36] focus:ring-[#0b5c36] border-gray-300 rounded cursor-pointer" 
+                className="h-4 w-4 text-primary focus:ring-primary border-outline-variant rounded cursor-pointer" 
               />
-              <label htmlFor="rememberEmployee" className="ml-2 block text-xs font-medium text-gray-600 cursor-pointer select-none">
-                Remember me
+              <label htmlFor="rememberAdmin" className="ml-2 block text-xs text-on-surface-variant cursor-pointer select-none">
+                Remember session on this device
               </label>
             </div>
 
             <button 
               type="submit" 
               disabled={isLoading}
-              className="w-full bg-[#0b5c36] hover:bg-[#08482a] text-white font-bold py-3.5 px-4 rounded-xl flex justify-center items-center transition-colors shadow-lg shadow-green-900/20 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
+              className="w-full mt-2 bg-primary hover:bg-primary/90 text-on-primary font-bold py-3.5 px-4 rounded-xl flex justify-center items-center gap-2 transition-colors shadow-xs disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
             >
               {isLoading ? (
                 <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Signing in...
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Signing in...</span>
                 </>
               ) : (
                 <>
-                  Login
-                  <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
-                  </svg>
+                  <span>Sign In</span>
+                  <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
           </form>
-
-          <div className="mt-8 text-center border-t border-gray-100 pt-6">
-            <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed">
-              For authorized staff only. You will be directed to your department dashboard.
-            </p>
-          </div>
         </div>
       </div>
     </motion.div>

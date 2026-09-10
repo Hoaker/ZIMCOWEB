@@ -458,8 +458,8 @@ export default function Compliance() {
             Government Regulated Cooperative
           </div>
           <h3 className="font-headline text-xl font-bold">Nigeria Cooperative Union Oversight</h3>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            All savings allocation modules, joint mutual partnerships, agricultural leasing options, and non-interest accounts are reported quarterly to state ministries of commerce and agriculture. Records can be verified under the cooperative registrations act of Nigeria.
+          <p className="text-xs text-slate-400">
+            All savings allocation modules and cooperative accounts are reported quarterly to state ministries of commerce and cooperative federations.
           </p>
         </div>
         

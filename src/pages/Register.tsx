@@ -237,9 +237,12 @@ export default function Register() {
         dob: formData.dob,
         department: formData.department,
         role: 'member',
-        ordinarySavings: Number(formData.ordinarySavings) || 20000,
-        specialSavings: Number(formData.specialSavings) || 10000,
-        investmentAmount: Number(formData.investmentAmount) || 0,
+        pledgedMonthlyOrdinarySavings: Number(formData.ordinarySavings) || 20000,
+        pledgedMonthlySpecialSavings: Number(formData.specialSavings) || 0,
+        pledgedMonthlyInvestment: Number(formData.investmentAmount) || 0,
+        ordinarySavings: 0,
+        specialSavings: 0,
+        investmentAmount: 0,
         commoditySavings: 0,
         muslimCommunitySavings: 0,
         muslimSavings: 0,
@@ -293,9 +296,12 @@ export default function Register() {
               dob: formData.dob,
               department: formData.department,
               role: 'member',
-              ordinarySavings: Number(formData.ordinarySavings) || 20000,
-              specialSavings: Number(formData.specialSavings) || 10000,
-              investmentAmount: Number(formData.investmentAmount) || 0,
+              pledgedMonthlyOrdinarySavings: Number(formData.ordinarySavings) || 20000,
+              pledgedMonthlySpecialSavings: Number(formData.specialSavings) || 0,
+              pledgedMonthlyInvestment: Number(formData.investmentAmount) || 0,
+              ordinarySavings: 0,
+              specialSavings: 0,
+              investmentAmount: 0,
               commoditySavings: 0,
               muslimCommunitySavings: 0,
               muslimSavings: 0,
@@ -548,9 +554,9 @@ export default function Register() {
                 <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-700/15 rounded-tr-full -ml-16 -mb-16 pointer-events-none" />
 
                 <div className="relative z-10">
-                  <div className="flex items-center gap-2 text-xl font-black tracking-widest text-[#10b981] mb-12">
+                  <div className="flex items-center gap-2 text-xl font-black tracking-widest text-primary-fixed mb-12">
                     <img src={zimcoLogo} alt="ZIMCO" className="w-8 h-8 rounded-full object-cover shadow-md" referrerPolicy="no-referrer" />
-                    <span className="font-headline">ZIMCO</span>
+                    <span className="font-headline text-white">ZIMCO</span>
                   </div>
                   
                   <h2 className="text-3xl font-black tracking-tight leading-tight font-headline mb-4">
@@ -563,13 +569,13 @@ export default function Register() {
 
                 <div className="space-y-4 relative z-10 pt-6 border-t border-emerald-800/60 max-w-sm">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-800/40 flex items-center justify-center text-[#10b981]">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-800/40 flex items-center justify-center text-primary-fixed">
                       <Shield className="w-4 h-4" />
                     </div>
                     <p className="text-xs font-semibold text-emerald-100/90">Zero-guarantor savings accounts</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-800/40 flex items-center justify-center text-[#10b981]">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-800/40 flex items-center justify-center text-primary-fixed">
                       <Wallet className="w-4 h-4" />
                     </div>
                     <p className="text-xs font-semibold text-emerald-100/90">Instantly accessible dividend pools</p>
@@ -724,7 +730,6 @@ export default function Register() {
                                   key={dept} 
                                   value={dept}
                                   className="bg-white text-slate-900"
-                                  style={{ color: '#0f172a', backgroundColor: '#ffffff' }}
                                 >
                                   {dept}
                                 </option>
@@ -790,7 +795,7 @@ export default function Register() {
                           </div>
                           
                           {/* Quick selection sliders */}
-                          <div className="grid grid-cols-4 gap-2">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                             {[10000, 20000, 50000, 100000].map(amt => (
                               <button
                                 key={amt}

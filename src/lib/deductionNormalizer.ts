@@ -22,6 +22,21 @@ export interface ColumnMapping {
   matchType?: 'exact' | 'alias' | 'none';
 }
 
+export interface DataQualityFlag {
+  type: 'unparsed_number' | 'ambiguous_date' | 'duplicate_header' | 'suspected_total_row';
+  severity: 'warning' | 'error';
+  message: string;
+  field?: string;
+  rawValue?: any;
+}
+
+export interface DuplicateHeaderCollision {
+  field: CanonicalField;
+  fieldLabel: string;
+  keptHeader: string;
+  droppedHeader: string;
+}
+
 export interface HeaderConformanceReport {
   exactMatches: Array<{ field: CanonicalField; label: string; rawHeader: string }>;
   missingStandardHeaders: Array<{ field: CanonicalField; label: string; required?: boolean }>;
@@ -40,6 +55,8 @@ export interface ParsedRawSheet {
   conformanceReport?: HeaderConformanceReport;
   rawFileBuffer?: ArrayBuffer;
   detectedCycleTitle?: string;
+  suggestedMonth?: string;
+  duplicateHeaderCollisions?: DuplicateHeaderCollision[];
 }
 
 export interface NormalizedDeductionRecord {
@@ -65,6 +82,7 @@ export interface NormalizedDeductionRecord {
     muslimCommunity: number;
   };
   extraExcludedData?: Record<string, any>;
+  dataQualityFlags?: DataQualityFlag[];
   // Disparity & Variance tracking
   expectedSent?: number;
   actualDeducted?: number;
@@ -477,6 +495,64 @@ export function cleanNumericValue(val: any): number {
   return isNegative ? -Math.abs(num) : num;
 }
 
+// Inspect a numeric cell and detect if non-numeric/unparseable content was passed (and defaulted to 0)
+export function inspectNumericCell(val: any, fieldLabel?: string): { value: number; flag?: DataQualityFlag } {
+  if (val === null || val === undefined || val === '') {
+    return { value: 0 };
+  }
+  if (typeof val === 'number') {
+    return { value: isNaN(val) ? 0 : val };
+  }
+  const str = String(val).trim();
+  if (str === '' || str === '-' || str === '--' || str === '0' || str === '0.00' || str === '0.0' || str === '₦0' || str === '₦0.00' || str === '₦ -') {
+    return { value: 0 };
+  }
+
+  // Check if it's a standard numerical representation (e.g. 25000, 25,000, 25000.50, ₦25,000, (5,000))
+  const cleanStr = str.replace(/[₦$€£,%\s]/g, '').replace(/^\(/, '').replace(/\)$/, '');
+  const isPureNumber = /^-?\d+(\.\d+)?$/.test(cleanStr);
+
+  const parsed = cleanNumericValue(val);
+
+  if (!isPureNumber) {
+    // Contains non-numeric text like "N/A", "pending", "none", "o", "nil", "TBD", or letters
+    return {
+      value: parsed,
+      flag: {
+        type: 'unparsed_number',
+        severity: 'warning',
+        message: "Cell wasn't a number — set to 0, worth checking",
+        field: fieldLabel,
+        rawValue: str
+      }
+    };
+  }
+
+  return { value: parsed };
+}
+
+// Check if a date string is ambiguous in day/month order (e.g. both parts <= 12)
+export function checkAmbiguousDate(val: any): DataQualityFlag | null {
+  if (val === null || val === undefined || val === '') return null;
+  if (typeof val === 'number' || val instanceof Date) return null;
+
+  const str = String(val).trim();
+  const match = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+  if (match) {
+    const p1 = parseInt(match[1], 10);
+    const p2 = parseInt(match[2], 10);
+    if (p1 >= 1 && p1 <= 12 && p2 >= 1 && p2 <= 12 && p1 !== p2) {
+      return {
+        type: 'ambiguous_date',
+        severity: 'warning',
+        message: `Date reads ${str} — confirm day or month`,
+        rawValue: str
+      };
+    }
+  }
+  return null;
+}
+
 // Clean and normalize spreadsheet date values (Excel serial numbers, ISO strings, DD/MM/YYYY, etc.)
 export function cleanDateValue(val: any): string {
   if (val === null || val === undefined || val === '') return '';
@@ -554,6 +630,356 @@ export function extractCycleMonthYear(dateVal: any): string {
   }
 
   return cleaned;
+}
+
+// Extract human-readable Month and Year from sheet names, tabs, or headers (e.g. "JAN 2026" -> "January 2026")
+export function detectMonthFromSheetNameOrText(text: string, defaultFallback: string = 'January 2026'): string {
+  if (!text) return defaultFallback;
+  const cleaned = text.trim().toLowerCase();
+
+  const monthConfigs = [
+    { name: 'January', aliases: ['january', 'jan one', 'jan 1', 'jan_1', 'jan-1', 'jan.1', 'jan'] },
+    { name: 'February', aliases: ['february', 'feb one', 'feb 1', 'feb_1', 'feb-1', 'feb.1', 'feb'] },
+    { name: 'March', aliases: ['march', 'mar one', 'mar 1', 'mar_1', 'mar-1', 'mar.1', 'mar'] },
+    { name: 'April', aliases: ['april', 'apr one', 'apr 1', 'apr_1', 'apr-1', 'apr.1', 'apr'] },
+    { name: 'May', aliases: ['may one', 'may 1', 'may_1', 'may-1', 'may.1', 'may'] },
+    { name: 'June', aliases: ['june', 'jun one', 'jun 1', 'jun_1', 'jun-1', 'jun.1', 'jun'] },
+    { name: 'July', aliases: ['july', 'jul one', 'jul 1', 'jul_1', 'jul-1', 'jul.1', 'jul'] },
+    { name: 'August', aliases: ['august', 'aug one', 'aug 1', 'aug_1', 'aug-1', 'aug.1', 'aug'] },
+    { name: 'September', aliases: ['september', 'sep one', 'sep 1', 'sep_1', 'sep-1', 'sep.1', 'sept', 'sep'] },
+    { name: 'October', aliases: ['october', 'oct one', 'oct 1', 'oct_1', 'oct-1', 'oct.1', 'oct'] },
+    { name: 'November', aliases: ['november', 'nov one', 'nov 1', 'nov_1', 'nov-1', 'nov.1', 'nov'] },
+    { name: 'December', aliases: ['december', 'dec one', 'dec 1', 'dec_1', 'dec-1', 'dec.1', 'dec'] }
+  ];
+
+  const yearMatch = text.match(/\b(20\d\d)\b/);
+  const detectedYear = yearMatch ? yearMatch[1] : '2026';
+
+  for (const m of monthConfigs) {
+    for (const alias of m.aliases) {
+      const regex = new RegExp(`(^|[^a-z0-9])${alias}([^a-z0-9]|$)`, 'i');
+      if (regex.test(cleaned) || cleaned.startsWith(alias) || cleaned.includes(alias)) {
+        return `${m.name} ${detectedYear}`;
+      }
+    }
+  }
+
+  return defaultFallback;
+}
+
+// Standard Cooperator titles
+const TITLES_SET = new Set([
+  'MR', 'MRS', 'MS', 'MISS', 'DR', 'DOCTOR', 'PROF', 'PROFESSOR', 
+  'ENGR', 'ENGINEER', 'ALHAJI', 'ALHAJA', 'HAJIA', 'CHIEF', 
+  'PASTOR', 'IMAM', 'REV', 'REVEREND', 'ARC', 'ARCHITECT', 
+  'PHARM', 'PHARMACIST', 'BARR', 'BARRISTER', 'HON'
+]);
+
+// Normalizes common spelling variations in names (e.g. abas -> abbas, muhammed -> muhammad)
+export function normalizeNameVariant(word: string): string {
+  const w = word.toLowerCase().trim();
+  if (w === 'abas') return 'abbas';
+  if (w === 'mohammed' || w === 'mohammad' || w === 'muhammed' || w === 'muhamed') return 'muhammad';
+  if (w === 'abdul-azeez' || w === 'abdulazeez' || w === 'abdul azeez') return 'abdulazeez';
+  if (w === 'abdul-hameed' || w === 'abdulhameed' || w === 'abdul hameed') return 'abdulhameed';
+  if (w === 'abdul-rasheed' || w === 'abdulrasheed' || w === 'abdul rasheed') return 'abdulrasheed';
+  if (w === 'abdul-lateef' || w === 'abdullateef' || w === 'abdul lateef') return 'abdullateef';
+  if (w === 'abdul-rahman' || w === 'abdulrahman' || w === 'abdul rahman') return 'abdulrahman';
+  if (w === 'abdul-wahab' || w === 'abdulwahab' || w === 'abdul wahab') return 'abdulwahab';
+  if (w === 'abdul-ganiyu' || w === 'abdulganiyu' || w === 'abdul ganiyu') return 'abdulganiyu';
+  return w;
+}
+
+// Extract clean, title-free name tokens
+export function extractNameTokens(name: string): string[] {
+  if (!name) return [];
+  const rawParts = name.split(/[\s,\/\._\-]+/).filter(Boolean);
+  const result: string[] = [];
+  for (const part of rawParts) {
+    const clean = part.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    if (!clean) continue;
+    if (TITLES_SET.has(clean.toUpperCase())) continue;
+    result.push(normalizeNameVariant(clean));
+  }
+  return result;
+}
+
+// Normalizes full name for exact comparison only.
+// Strips titles (DR, MR, MRS, etc.), punctuation, and normalizes internal whitespace.
+export function normalizeFullNameForExactMatch(name: string): string {
+  if (!name) return '';
+  const rawParts = name.split(/[\s,\/\._\-]+/).filter(Boolean);
+  const result: string[] = [];
+  for (const part of rawParts) {
+    const clean = part.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    if (!clean) continue;
+    if (TITLES_SET.has(clean.toUpperCase())) continue;
+    result.push(normalizeNameVariant(clean));
+  }
+  return result.join(' ');
+}
+
+// Check if two full names refer to the exact same individual.
+// STRICT: Requires exact normalized full string equality or exact identical tokens.
+// Under no circumstances does this match on partial names or shared surnames (e.g. "Ajibade Abdul-Azeez A." vs "Ajibade Aishat" NEVER match).
+export function isExactOrTokenNameMatch(nameA: string, nameB: string): boolean {
+  if (!nameA || !nameB) return false;
+  const strA = nameA.trim().toLowerCase();
+  const strB = nameB.trim().toLowerCase();
+  
+  // Exact string match
+  if (strA === strB) return true;
+  
+  // Exact compact match (ignoring spaces, hyphens, and punctuation)
+  const compA = strA.replace(/[^a-z0-9]/g, '');
+  const compB = strB.replace(/[^a-z0-9]/g, '');
+  if (compA && compB && compA === compB) return true;
+
+  // Exact normalized full name comparison
+  const normA = normalizeFullNameForExactMatch(nameA);
+  const normB = normalizeFullNameForExactMatch(nameB);
+  if (normA && normB && normA === normB) return true;
+
+  const tokensA = extractNameTokens(nameA);
+  const tokensB = extractNameTokens(nameB);
+
+  // Require at least 2 tokens (Surname + Given name) to ever match by tokens, preventing single-surname matches
+  if (tokensA.length < 2 || tokensB.length < 2) return false;
+
+  const setA = new Set(tokensA);
+  const setB = new Set(tokensB);
+
+  // Every significant token in one MUST exist in the other with zero conflicting given names
+  const unsharedA = tokensA.filter(t => !setB.has(t) && t.length >= 3);
+  const unsharedB = tokensB.filter(t => !setA.has(t) && t.length >= 3);
+
+  if (unsharedA.length > 0 || unsharedB.length > 0) {
+    return false; // Conflicting or distinct given names
+  }
+
+  // Check that all significant tokens match exactly
+  const sigA = tokensA.filter(t => t.length >= 3);
+  const sigB = tokensB.filter(t => t.length >= 3);
+  if (sigA.length >= 2 && sigB.length >= 2 && sigA.length === sigB.length) {
+    return sigA.every(t => setB.has(t));
+  }
+
+  return false;
+}
+
+export interface MemberMatchCandidate {
+  id?: string;
+  memberId?: string;
+  docId?: string;
+  firestoreDocId?: string;
+  uid?: string;
+  staffId?: string;
+  payrollNo?: string;
+  name?: string;
+  fullName?: string;
+  surname?: string;
+  firstName?: string;
+  email?: string;
+  password?: string;
+  defaultPassword?: string;
+  [key: string]: any;
+}
+
+export interface MatchResult<T> {
+  member: T | null;
+  matchType: 'exact_id' | 'exact_full_name' | 'unmatched';
+  reason?: string;
+}
+
+/**
+ * Derives a secure, deterministic default password strictly from the member's unique ZIM ID.
+ * NEVER derives credentials from names, first names, or surnames.
+ * e.g. "ZIM-2026-001" -> "zimco#zim2026001"
+ */
+export function deriveDefaultPassword(memberId: string): string {
+  const clean = (memberId || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  return clean ? `zimco#${clean}` : 'zimco#member2026';
+}
+
+/**
+ * Robust, non-guessing member matcher for payroll import ingestion.
+ * Resolves members ONLY by:
+ * 1. Exact unique ID match (docId, id, memberId, uid, staffId, payrollNo)
+ * 2. Fallback ONLY: Exact normalized full-name match (entire full name, NEVER substring)
+ * Returns unmatched if no match or if ambiguous.
+ */
+export function matchMemberForImport<T extends MemberMatchCandidate>(
+  recordId: string | undefined,
+  recordName: string | undefined,
+  membersList: T[]
+): MatchResult<T> {
+  if (!membersList || membersList.length === 0) {
+    return { member: null, matchType: 'unmatched', reason: 'No members registered in database' };
+  }
+
+  const cleanId = (recordId || '').trim().toUpperCase();
+  if (cleanId) {
+    const idMatches = membersList.filter(m => {
+      const mId = (m.id || m.memberId || '').trim().toUpperCase();
+      const mDocId = (m.docId || m.firestoreDocId || '').trim().toUpperCase();
+      const mStaff = (m.staffId || m.payrollNo || '').trim().toUpperCase();
+      const mUid = (m.uid || '').trim().toUpperCase();
+
+      return (mId && mId === cleanId) ||
+             (mDocId && mDocId === cleanId) ||
+             (mStaff && mStaff === cleanId) ||
+             (mUid && mUid === cleanId);
+    });
+
+    if (idMatches.length === 1) {
+      return { member: idMatches[0], matchType: 'exact_id' };
+    } else if (idMatches.length > 1) {
+      return { member: null, matchType: 'unmatched', reason: `Ambiguous: ID '${cleanId}' matches multiple member records` };
+    }
+  }
+
+  // Fallback ONLY for import: exact normalized full-name match (entire name, never substring)
+  const cleanName = (recordName || '').trim();
+  if (cleanName) {
+    const targetNorm = normalizeFullNameForExactMatch(cleanName);
+    const targetCompact = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    if (targetCompact.length >= 4) {
+      const nameMatches = membersList.filter(m => {
+        const mFullName = (m.fullName || m.name || '').trim();
+        if (!mFullName) return false;
+        const mNorm = normalizeFullNameForExactMatch(mFullName);
+        const mCompact = mFullName.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        // Must match either exact normalized string or exact compact string
+        return (targetNorm && mNorm && targetNorm === mNorm) || (targetCompact && mCompact && targetCompact === mCompact);
+      });
+
+      if (nameMatches.length === 1) {
+        return { member: nameMatches[0], matchType: 'exact_full_name' };
+      } else if (nameMatches.length > 1) {
+        return { member: null, matchType: 'unmatched', reason: `Ambiguous: Multiple members share the full name '${cleanName}'` };
+      }
+    }
+  }
+
+  return { member: null, matchType: 'unmatched', reason: 'No exact ID or exact full-name match found' };
+}
+
+// Strict cooperator locator: matches ONLY on exact unique ID, exact email, or exact normalized full name.
+// Substring matching, surname fallbacks, and token permutations have been removed to prevent cross-account collisions.
+export function findBestMatchingMember<T extends MemberMatchCandidate>(
+  inputIdentifier: string,
+  membersList: T[]
+): T | null {
+  if (!inputIdentifier || !membersList || membersList.length === 0) return null;
+  const inputTrim = inputIdentifier.trim();
+  const inputUpper = inputTrim.toUpperCase();
+  const inputLower = inputTrim.toLowerCase();
+  const inputClean = inputTrim.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  // 1. Exact Member ID / Doc ID / Staff ID / UID match (Highest Priority)
+  for (const m of membersList) {
+    const mId = (m.id || m.memberId || '').toUpperCase().trim();
+    const mDocId = (m.docId || m.firestoreDocId || '').toUpperCase().trim();
+    const mStaff = (m.staffId || m.payrollNo || '').toUpperCase().trim();
+    const mUid = (m.uid || '').toUpperCase().trim();
+
+    if (
+      (mId && mId === inputUpper) ||
+      (mDocId && mDocId === inputUpper) ||
+      (mStaff && mStaff === inputUpper) ||
+      (mUid && mUid === inputUpper)
+    ) {
+      return m;
+    }
+  }
+
+  // 2. Exact Email match
+  if (inputLower.includes('@')) {
+    for (const m of membersList) {
+      const mEmail = (m.email || '').toLowerCase().trim();
+      if (mEmail && mEmail === inputLower) {
+        return m;
+      }
+    }
+  }
+
+  // 3. Exact Normalized Full Name match (entire name strictly matches, never substring)
+  const targetNorm = normalizeFullNameForExactMatch(inputTrim);
+  const matchingByName = membersList.filter(m => {
+    const mFullName = (m.fullName || m.name || '').trim();
+    if (!mFullName) return false;
+    const mNorm = normalizeFullNameForExactMatch(mFullName);
+    const mClean = mFullName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return (targetNorm && mNorm && targetNorm === mNorm) || (inputClean.length >= 5 && mClean === inputClean);
+  });
+
+  // Only return if unambiguous (exactly 1 match)
+  if (matchingByName.length === 1) {
+    return matchingByName[0];
+  }
+
+  return null;
+}
+
+// Extract Cooperator First Name for use as secure default password and greeting
+export function extractFirstName(fullName: string): string {
+  if (!fullName) return 'member';
+  const cleaned = fullName.trim();
+
+  // Handle format: "SURNAME, Firstname Middlename" (e.g. "ABAS, Sharafat T." or "AJIBADE, Abdul-Azeez A.")
+  if (cleaned.includes(',')) {
+    const afterComma = cleaned.split(',')[1]?.trim() || '';
+    if (afterComma) {
+      const tokens = afterComma.split(/[\s\-]+/).map(t => t.replace(/[^a-zA-Z0-9]/g, '')).filter(Boolean);
+      const validTokens = tokens.filter(t => !TITLES_SET.has(t.toUpperCase()) && t.length > 1);
+      if (validTokens.length > 0) {
+        return validTokens[0].toLowerCase();
+      }
+      if (tokens.length > 0) {
+        return tokens[0].toLowerCase();
+      }
+    }
+  }
+
+  // Handle format without comma: e.g. "AJIBADE ABDUL-AZEEZ A." or "Dr. Sharafat Abas" or "Abdulhameed Amao"
+  const tokens = cleaned.split(/[\s\-]+/).map(t => t.replace(/[^a-zA-Z0-9]/g, '')).filter(Boolean);
+  const filteredTokens = tokens.filter(t => !TITLES_SET.has(t.toUpperCase()));
+
+  if (filteredTokens.length > 1) {
+    // In Nigerian institutional payrolls (SURNAME FIRSTNAME [MIDDLENAME]), the second token is the given name
+    const givenToken = filteredTokens.slice(1).find(t => t.length > 1);
+    if (givenToken) {
+      return givenToken.toLowerCase();
+    }
+    return filteredTokens[1].toLowerCase();
+  }
+
+  if (filteredTokens.length === 1) {
+    return filteredTokens[0].toLowerCase();
+  }
+
+  return 'member';
+}
+
+// Extract Cooperator Surname in lowercase
+export function extractSurname(fullName: string): string {
+  if (!fullName) return 'member';
+  const cleaned = fullName.trim();
+  if (cleaned.includes(',')) {
+    const beforeComma = cleaned.split(',')[0].trim();
+    const cleanSurname = beforeComma.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    if (cleanSurname) return cleanSurname;
+  }
+  const parts = cleaned.split(/\s+/).map(p => p.replace(/[^a-zA-Z0-9]/g, '')).filter(Boolean);
+  const filtered = parts.filter(p => !TITLES_SET.has(p.toUpperCase()));
+  
+  // In Nigerian payroll & institutional lists without commas, the FIRST word is virtually always the Surname (e.g. "AJIBADE ABDUL-AZEEZ A." -> "ajibade", "AMAO ABDULHAMEED" -> "amao")
+  if (filtered.length > 0) {
+    return filtered[0].toLowerCase();
+  }
+  return 'member';
 }
 
 // Intelligent header detection: matches canonical names, explicit approved aliases, and domain tokens
@@ -908,17 +1334,27 @@ export function parseSpreadsheetBuffer(buffer: ArrayBuffer, fileName: string, ta
     }
   }
 
-  // Generate initial column mappings with strict detection
-  const usedFields = new Set<CanonicalField>();
+  // Generate initial column mappings with strict detection and track collisions
+  const usedFields = new Map<CanonicalField, string>();
+  const duplicateHeaderCollisions: DuplicateHeaderCollision[] = [];
+
   const columnMappings: ColumnMapping[] = rawHeaders.map(header => {
     const detection = autoDetectField(header);
     let detected = detection.field;
     
-    // Prevent duplicate mapping of single-use fields
+    // Prevent duplicate mapping of single-use fields & track collision
     if (detected !== 'unmapped' && usedFields.has(detected)) {
+      const previousHeader = usedFields.get(detected)!;
+      const canonicalOpt = CANONICAL_FIELD_OPTIONS.find(c => c.field === detected);
+      duplicateHeaderCollisions.push({
+        field: detected,
+        fieldLabel: canonicalOpt?.label || detected,
+        keptHeader: previousHeader,
+        droppedHeader: header
+      });
       detected = 'unmapped';
     } else if (detected !== 'unmapped') {
-      usedFields.add(detected);
+      usedFields.set(detected, header);
     }
 
     // Extract first 3 non-empty sample values
@@ -941,6 +1377,7 @@ export function parseSpreadsheetBuffer(buffer: ArrayBuffer, fileName: string, ta
   });
 
   const conformanceReport = evaluateHeaderConformance(rawHeaders, columnMappings);
+  const suggestedMonth = detectMonthFromSheetNameOrText(sheetName, detectedCycleTitle ? detectMonthFromSheetNameOrText(detectedCycleTitle, 'January 2026') : 'January 2026');
 
   return {
     fileName,
@@ -952,7 +1389,9 @@ export function parseSpreadsheetBuffer(buffer: ArrayBuffer, fileName: string, ta
     columnMappings,
     conformanceReport,
     rawFileBuffer: buffer,
-    detectedCycleTitle: detectedCycleTitle || sheetName
+    detectedCycleTitle: detectedCycleTitle || sheetName,
+    suggestedMonth,
+    duplicateHeaderCollisions
   };
 }
 
@@ -1124,18 +1563,62 @@ export function normalizeRawRows(
     const id = rawId || `ZIM-ROW-${String(i + 1).padStart(3, '0')}`;
     const name = rawName || 'Unnamed Contributor';
 
-    // Extract numeric amounts
-    const ordinarySavings = fieldToHeaderMap['ordinarySavings'] ? cleanNumericValue(row[fieldToHeaderMap['ordinarySavings']!]) : 0;
-    const specialSavings = fieldToHeaderMap['specialSavings'] ? cleanNumericValue(row[fieldToHeaderMap['specialSavings']!]) : 0;
-    const investment = fieldToHeaderMap['investment'] ? cleanNumericValue(row[fieldToHeaderMap['investment']!]) : 0;
-    const loanReimbursement = fieldToHeaderMap['loanReimbursement'] ? cleanNumericValue(row[fieldToHeaderMap['loanReimbursement']!]) : 0;
-    const commodityPurchase = fieldToHeaderMap['commodityPurchase'] ? cleanNumericValue(row[fieldToHeaderMap['commodityPurchase']!]) : 0;
-    const muslimCommunity = fieldToHeaderMap['muslimCommunity'] ? cleanNumericValue(row[fieldToHeaderMap['muslimCommunity']!]) : 0;
+    const rowFlags: DataQualityFlag[] = [];
+
+    // Date ambiguity check
+    if (dateHeader && row[dateHeader]) {
+      const dateFlag = checkAmbiguousDate(row[dateHeader]);
+      if (dateFlag) rowFlags.push(dateFlag);
+    }
+
+    // Extract & inspect numeric amounts
+    const osInspect = fieldToHeaderMap['ordinarySavings'] ? inspectNumericCell(row[fieldToHeaderMap['ordinarySavings']!], 'Ordinary Savings') : { value: 0 };
+    if (osInspect.flag) rowFlags.push(osInspect.flag);
+    const ordinarySavings = osInspect.value;
+
+    const ssInspect = fieldToHeaderMap['specialSavings'] ? inspectNumericCell(row[fieldToHeaderMap['specialSavings']!], 'Special Savings') : { value: 0 };
+    if (ssInspect.flag) rowFlags.push(ssInspect.flag);
+    const specialSavings = ssInspect.value;
+
+    const invInspect = fieldToHeaderMap['investment'] ? inspectNumericCell(row[fieldToHeaderMap['investment']!], 'Investment') : { value: 0 };
+    if (invInspect.flag) rowFlags.push(invInspect.flag);
+    const investment = invInspect.value;
+
+    const lrInspect = fieldToHeaderMap['loanReimbursement'] ? inspectNumericCell(row[fieldToHeaderMap['loanReimbursement']!], 'Loan Repayment') : { value: 0 };
+    if (lrInspect.flag) rowFlags.push(lrInspect.flag);
+    const loanReimbursement = lrInspect.value;
+
+    const cpInspect = fieldToHeaderMap['commodityPurchase'] ? inspectNumericCell(row[fieldToHeaderMap['commodityPurchase']!], 'Commodity Purchase') : { value: 0 };
+    if (cpInspect.flag) rowFlags.push(cpInspect.flag);
+    const commodityPurchase = cpInspect.value;
+
+    const mcInspect = fieldToHeaderMap['muslimCommunity'] ? inspectNumericCell(row[fieldToHeaderMap['muslimCommunity']!], 'Muslim Community') : { value: 0 };
+    if (mcInspect.flag) rowFlags.push(mcInspect.flag);
+    const muslimCommunity = mcInspect.value;
 
     const calculatedSum = ordinarySavings + specialSavings + investment + commodityPurchase + loanReimbursement + muslimCommunity;
     
     // Total from sheet (or calculated if total column was excluded/omitted)
-    const declaredTotal = fieldToHeaderMap['total'] ? cleanNumericValue(row[fieldToHeaderMap['total']!]) : calculatedSum;
+    const totInspect = fieldToHeaderMap['total'] ? inspectNumericCell(row[fieldToHeaderMap['total']!], 'Declared Total') : { value: calculatedSum };
+    if (totInspect.flag) rowFlags.push(totInspect.flag);
+    const declaredTotal = fieldToHeaderMap['total'] ? totInspect.value : calculatedSum;
+
+    // Check for Suspected Total Row (e.g. "Total", "Grand Total", "Summary", "Balance C/F", or huge outlier without a real member name)
+    const lowerName = rawName.toLowerCase();
+    const lowerId = rawId.toLowerCase();
+    const isTotalKeyword = /^(total|grand\s*total|sub\s*total|subtotal|summary|balance\s*c\/?f|brought\s*forward|all\s*members|general\s*total|gross\s*total|sum\s*total)\b/i.test(lowerName) ||
+      /^(total|grand\s*total|sub\s*total|subtotal|summary)\b/i.test(lowerId);
+    
+    const isSuspiciousOutlier = calculatedSum > 2500000 && !/^[A-Za-z\s,.'-]{4,}$/.test(rawName);
+    const lacksPlausibleName = !/[a-zA-Z]{3,}/.test(rawName) && calculatedSum > 500000;
+
+    if (isTotalKeyword || isSuspiciousOutlier || lacksPlausibleName) {
+      rowFlags.push({
+        type: 'suspected_total_row',
+        severity: 'error',
+        message: 'Looks like a total row, not a member — exclude?'
+      });
+    }
 
     // Collect extra excluded data for complete auditing if needed
     const extraExcludedData: Record<string, any> = {};
@@ -1149,18 +1632,27 @@ export function normalizeRawRows(
     let status: 'valid' | 'warning' | 'error' = 'valid';
     let message = 'All fields cleared and matched against register.';
 
-    if (ordinarySavings > ceilings.ordinarySavingsCeiling) {
+    if (fieldToHeaderMap['total'] && Math.abs(calculatedSum - declaredTotal) > 1) {
       status = 'error';
-      message = `LIMIT MISMATCH: Ordinary Savings ₦${ordinarySavings.toLocaleString()} exceeds ceiling threshold limit (₦${ceilings.ordinarySavingsCeiling.toLocaleString()}).`;
+      message = `MATH MISMATCH: Itemized sum is ₦${calculatedSum.toLocaleString()} but sheet declared total is ₦${declaredTotal.toLocaleString()}.`;
+    } else if (ordinarySavings > ceilings.ordinarySavingsCeiling) {
+      status = 'warning';
+      message = `THRESHOLD NOTICE: Ordinary Savings ₦${ordinarySavings.toLocaleString()} exceeds threshold limit (₦${ceilings.ordinarySavingsCeiling.toLocaleString()}).`;
     } else if (specialSavings > ceilings.specialSavingsCeiling) {
-      status = 'error';
-      message = `LIMIT MISMATCH: Special Savings ₦${specialSavings.toLocaleString()} exceeds ceiling threshold limit (₦${ceilings.specialSavingsCeiling.toLocaleString()}).`;
-    } else if (fieldToHeaderMap['total'] && calculatedSum !== declaredTotal) {
-      status = 'error';
-      message = `MATH ERROR: Itemized sum is ₦${calculatedSum.toLocaleString()} but sheet declared total is ₦${declaredTotal.toLocaleString()}.`;
+      status = 'warning';
+      message = `THRESHOLD NOTICE: Special Savings ₦${specialSavings.toLocaleString()} exceeds threshold limit (₦${ceilings.specialSavingsCeiling.toLocaleString()}).`;
     } else if (calculatedSum > 350000) {
       status = 'warning';
-      message = 'WARN: High-value deduction requires supplemental approval certificate.';
+      message = 'AUDIT NOTICE: High-value deduction requires standard bursary reconciliation review.';
+    }
+
+    // If row has error flags, elevate status if not already error
+    if (rowFlags.some(f => f.severity === 'error') && status !== 'error') {
+      status = 'error';
+      message = rowFlags.find(f => f.severity === 'error')!.message;
+    } else if (rowFlags.some(f => f.severity === 'warning') && status === 'valid') {
+      status = 'warning';
+      message = rowFlags.find(f => f.severity === 'warning')!.message;
     }
 
     normalized.push({
@@ -1176,6 +1668,7 @@ export function normalizeRawRows(
       total: fieldToHeaderMap['total'] ? declaredTotal : calculatedSum,
       status,
       message,
+      dataQualityFlags: rowFlags.length > 0 ? rowFlags : undefined,
       extraExcludedData
     });
   }

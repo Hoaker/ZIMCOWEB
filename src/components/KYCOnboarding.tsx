@@ -676,7 +676,7 @@ export default function KYCOnboarding() {
                           {isCameraScanning ? (
                             <div className="space-y-3 relative z-10 flex flex-col items-center justify-center h-full w-full">
                               {/* Horizontal scanning light element */}
-                              <div className="absolute top-0 inset-x-0 h-1 bg-emerald-400 shadow-[0_0_15px_#10b981] animate-[bounce_2s_infinite]"></div>
+                              <div className="absolute top-0 inset-x-0 h-1 bg-emerald-400 shadow-sm shadow-emerald-400 animate-[bounce_2s_infinite]"></div>
                               <RefreshCw size={28} className="text-emerald-400 animate-spin" />
                               <p className="text-xs font-mono font-bold tracking-widest text-emerald-400">CHECKING PHOTO...</p>
                             </div>

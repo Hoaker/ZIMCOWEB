@@ -4,44 +4,19 @@ import { cn } from '@/lib/utils';
 import { 
   Menu, 
   X, 
-  Landmark,
+  Landmark, 
   ShieldCheck, 
   ChevronDown, 
   ArrowRight,
-  Info,
-  Scale,
   PhoneCall
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import zimcoLogo from '@/assets/images/zimco_logo_1780347665840.png';
 
-const companySubLinks = [
-  { 
-    name: 'About Us', 
-    desc: 'Our mission, heritage, and values',
-    path: '/about',
-    icon: Info
-  },
-  { 
-    name: 'Compliance & Governance', 
-    desc: 'Regulatory standards & ethics',
-    path: '/compliance',
-    icon: Scale
-  },
-  { 
-    name: 'Contact & Support', 
-    desc: 'Get in touch with our team',
-    path: '/contact',
-    icon: PhoneCall
-  },
-];
-
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoginHovered, setIsLoginHovered] = useState(false);
-  const [isCompanyHovered, setIsCompanyHovered] = useState(false);
   const loginTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const companyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const location = useLocation();
 
   const handleLoginMouseEnter = () => {
@@ -55,19 +30,6 @@ export default function Navbar() {
     }, 150);
   };
 
-  const handleCompanyMouseEnter = () => {
-    if (companyTimeoutRef.current) clearTimeout(companyTimeoutRef.current);
-    setIsCompanyHovered(true);
-  };
-
-  const handleCompanyMouseLeave = () => {
-    companyTimeoutRef.current = setTimeout(() => {
-      setIsCompanyHovered(false);
-    }, 150);
-  };
-
-  const isCompanyActive = companySubLinks.some(link => location.pathname === link.path);
-
   return (
     <nav className="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-xl shadow-[0px_20px_40px_rgba(25,28,29,0.04)] border-b border-slate-100">
       <div className="flex justify-between items-center px-4 sm:px-8 py-3.5 sm:py-4 max-w-7xl mx-auto w-full">
@@ -76,15 +38,15 @@ export default function Navbar() {
           <span>ZIMCO</span>
         </Link>
 
-        {/* Desktop Nav - Clean & Grouped (Approach A) */}
+        {/* Desktop Nav - Clean, Non-redundant */}
         <div className="hidden md:flex items-center space-x-7 lg:space-x-8">
           <Link
             to="/"
             className={cn(
-              "font-manrope text-sm font-semibold tracking-tight transition-all pb-1 border-b-2",
+              "text-xs sm:text-sm font-semibold tracking-tight transition-all pb-1 border-b-2",
               location.pathname === '/'
-                ? "text-emerald-700 border-emerald-700"
-                : "text-slate-600 border-transparent hover:text-emerald-700"
+                ? "text-primary border-primary font-bold"
+                : "text-on-surface-variant border-transparent hover:text-primary"
             )}
           >
             Home
@@ -93,88 +55,26 @@ export default function Navbar() {
           <Link
             to="/services"
             className={cn(
-              "font-manrope text-sm font-semibold tracking-tight transition-all pb-1 border-b-2",
+              "text-xs sm:text-sm font-semibold tracking-tight transition-all pb-1 border-b-2",
               location.pathname === '/services'
-                ? "text-emerald-700 border-emerald-700"
-                : "text-slate-600 border-transparent hover:text-emerald-700"
+                ? "text-primary border-primary font-bold"
+                : "text-on-surface-variant border-transparent hover:text-primary"
             )}
           >
             Services
           </Link>
 
-          {/* Company / Society Dropdown */}
-          <div 
-            className="relative"
-            onMouseEnter={handleCompanyMouseEnter}
-            onMouseLeave={handleCompanyMouseLeave}
+          <Link
+            to="/contact"
+            className={cn(
+              "text-xs sm:text-sm font-semibold tracking-tight transition-all pb-1 border-b-2",
+              location.pathname === '/contact'
+                ? "text-primary border-primary font-bold"
+                : "text-on-surface-variant border-transparent hover:text-primary"
+            )}
           >
-            <button
-              type="button"
-              onClick={() => setIsCompanyHovered(!isCompanyHovered)}
-              className={cn(
-                "flex items-center gap-1.5 font-manrope text-sm font-semibold tracking-tight transition-all pb-1 border-b-2 cursor-pointer",
-                isCompanyActive || isCompanyHovered
-                  ? "text-emerald-700 border-emerald-700"
-                  : "text-slate-600 border-transparent hover:text-emerald-700"
-              )}
-              aria-expanded={isCompanyHovered}
-              aria-haspopup="true"
-            >
-              <span>About Us</span>
-              <ChevronDown 
-                className={cn(
-                  "w-3.5 h-3.5 text-slate-400 transition-transform duration-200",
-                  isCompanyHovered && "rotate-180 text-emerald-700"
-                )} 
-              />
-            </button>
-
-            {/* Company Dropdown Menu */}
-            <AnimatePresence>
-              {isCompanyHovered && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                  transition={{ duration: 0.15, ease: 'easeOut' }}
-                  className="absolute left-0 top-full pt-2 w-64 z-50 origin-top-left"
-                >
-                  <div className="bg-white rounded-2xl p-2 shadow-[0_20px_50px_-12px_rgba(15,23,42,0.18)] border border-slate-100 ring-1 ring-slate-900/5 space-y-1">
-                    {companySubLinks.map((item) => {
-                      const Icon = item.icon;
-                      const isItemActive = location.pathname === item.path;
-                      return (
-                        <Link
-                          key={item.path}
-                          to={item.path}
-                          onClick={() => setIsCompanyHovered(false)}
-                          className={cn(
-                            "group flex items-start gap-3 p-2.5 rounded-xl transition-all font-semibold text-sm",
-                            isItemActive 
-                              ? "bg-emerald-50 text-emerald-900" 
-                              : "hover:bg-slate-50 text-slate-800 hover:text-emerald-900"
-                          )}
-                        >
-                          <div className={cn(
-                            "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors mt-0.5",
-                            isItemActive
-                              ? "bg-emerald-600 text-white"
-                              : "bg-emerald-50 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white"
-                          )}>
-                            <Icon className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <div className="text-sm font-bold leading-tight">{item.name}</div>
-                            <div className="text-[11px] text-slate-400 font-normal mt-0.5 leading-snug">{item.desc}</div>
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+            Contact & Support
+          </Link>
         </div>
 
         <div className="flex items-center gap-3 sm:gap-4">
@@ -188,10 +88,10 @@ export default function Navbar() {
               type="button"
               onClick={() => setIsLoginHovered(!isLoginHovered)}
               className={cn(
-                "flex items-center gap-1.5 font-manrope text-xs sm:text-sm font-semibold tracking-tight px-3.5 sm:px-4 py-2 rounded-full transition-all cursor-pointer",
+                "flex items-center gap-1.5 text-xs sm:text-sm font-semibold tracking-tight px-3.5 sm:px-4 py-2 rounded-xl transition-all cursor-pointer",
                 isLoginHovered || location.pathname.startsWith('/login')
-                  ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200"
-                  : "text-slate-700 hover:bg-slate-100/80 hover:text-emerald-800"
+                  ? "bg-primary/10 text-primary font-bold ring-1 ring-primary/20"
+                  : "text-on-surface hover:bg-surface-container-low hover:text-primary"
               )}
               aria-expanded={isLoginHovered}
               aria-haspopup="true"
@@ -199,8 +99,8 @@ export default function Navbar() {
               <span>Login</span>
               <ChevronDown 
                 className={cn(
-                  "w-3.5 h-3.5 text-slate-400 transition-transform duration-200",
-                  isLoginHovered && "rotate-180 text-emerald-700"
+                  "w-3.5 h-3.5 text-on-surface-variant transition-transform duration-200",
+                  isLoginHovered && "rotate-180 text-primary"
                 )} 
               />
             </button>
@@ -215,31 +115,31 @@ export default function Navbar() {
                   transition={{ duration: 0.15, ease: 'easeOut' }}
                   className="absolute right-0 top-full pt-2 w-56 z-50 origin-top-right"
                 >
-                  <div className="bg-white rounded-2xl p-1.5 shadow-[0_20px_50px_-12px_rgba(15,23,42,0.18)] border border-slate-100 ring-1 ring-slate-900/5">
+                  <div className="bg-surface-container-lowest rounded-2xl p-1.5 shadow-md border border-outline-variant/60">
                     {/* Member Login Option */}
                     <Link
                       to="/login/member"
                       onClick={() => setIsLoginHovered(false)}
-                      className="group flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-slate-800 hover:text-emerald-900 transition-all font-semibold text-sm"
+                      className="group flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-primary/10 text-on-surface hover:text-primary transition-all font-semibold text-xs sm:text-sm"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-on-primary transition-colors">
                         <Landmark className="w-4 h-4" />
                       </div>
-                      <span className="flex-1">Member</span>
-                      <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-700 group-hover:translate-x-0.5 transition-all" />
+                      <span className="flex-1">Member Portal</span>
+                      <ArrowRight className="w-4 h-4 text-on-surface-variant/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
                     </Link>
 
                     {/* Staff Login Option */}
                     <Link
                       to="/login/staff"
                       onClick={() => setIsLoginHovered(false)}
-                      className="group flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 text-slate-800 hover:text-slate-950 transition-all font-semibold text-sm"
+                      className="group flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-low text-on-surface hover:text-primary transition-all font-semibold text-xs sm:text-sm"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 group-hover:bg-slate-900 group-hover:text-white transition-colors">
+                      <div className="w-8 h-8 rounded-lg bg-surface-container text-on-surface-variant flex items-center justify-center shrink-0 group-hover:bg-primary/20 group-hover:text-primary transition-colors">
                         <ShieldCheck className="w-4 h-4" />
                       </div>
-                      <span className="flex-1">Staff</span>
-                      <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-900 group-hover:translate-x-0.5 transition-all" />
+                      <span className="flex-1">Staff / Bursary</span>
+                      <ArrowRight className="w-4 h-4 text-on-surface-variant/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
                     </Link>
                   </div>
                 </motion.div>
@@ -249,9 +149,9 @@ export default function Navbar() {
 
           <Link 
             to="/join" 
-            className="bg-primary hover:bg-emerald-800 text-on-primary px-4 sm:px-6 py-2 sm:py-2.5 rounded-full font-manrope text-xs sm:text-sm font-semibold tracking-tight scale-95 active:scale-90 transition-transform shadow-sm"
+            className="bg-primary hover:bg-primary/90 text-on-primary px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold tracking-tight scale-95 active:scale-90 transition-transform shadow-xs cursor-pointer"
           >
-            Join Now
+            Join Society
           </Link>
           
           {/* Mobile Toggle */}
@@ -296,50 +196,40 @@ export default function Navbar() {
                 Services
               </Link>
               
-              <div className="pt-2">
-                <span className="text-[11px] font-extrabold uppercase tracking-widest text-slate-400 block mb-2">
-                  About ZIMCO
-                </span>
-                <div className="space-y-2 pl-2 border-l-2 border-emerald-100">
-                  {companySubLinks.map((subLink) => (
-                    <Link
-                      key={subLink.path}
-                      to={subLink.path}
-                      onClick={() => setIsOpen(false)}
-                      className={cn(
-                        "block text-sm font-semibold py-1",
-                        location.pathname === subLink.path ? "text-emerald-700 font-bold" : "text-slate-600"
-                      )}
-                    >
-                      {subLink.name}
-                    </Link>
-                  ))}
-                </div>
-              </div>
+              <Link
+                to="/contact"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "block text-base font-bold py-1",
+                  location.pathname === '/contact' ? "text-emerald-700" : "text-slate-700"
+                )}
+              >
+                Contact & Support
+              </Link>
             </div>
 
             {/* Mobile Portals Breakdown */}
-            <div className="pt-4 border-t border-slate-100">
-              <span className="text-[11px] font-extrabold uppercase tracking-widest text-slate-400 block mb-2.5">
+            <div className="pt-4 border-t border-outline-variant/40">
+              <span className="text-[11px] font-extrabold uppercase tracking-widest text-on-surface-variant block mb-2.5">
                 Login Options
               </span>
               <div className="grid grid-cols-2 gap-2">
                 <Link
                   to="/login/member"
                   onClick={() => setIsOpen(false)}
-                  className="flex items-center justify-center gap-2 p-3 rounded-xl bg-emerald-50 text-emerald-900 hover:bg-emerald-100 transition-colors font-bold text-sm"
+                  className="flex items-center justify-center gap-2 p-3 rounded-xl bg-primary/10 text-primary hover:bg-primary/15 transition-colors font-bold text-xs sm:text-sm"
                 >
-                  <Landmark className="w-4 h-4 text-emerald-700" />
-                  <span>Member</span>
+                  <Landmark className="w-4 h-4" />
+                  <span>Member Portal</span>
                 </Link>
 
                 <Link
                   to="/login/staff"
                   onClick={() => setIsOpen(false)}
-                  className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-100 text-slate-900 hover:bg-slate-200 transition-colors font-bold text-sm"
+                  className="flex items-center justify-center gap-2 p-3 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container transition-colors font-bold text-xs sm:text-sm border border-outline-variant/50"
                 >
-                  <ShieldCheck className="w-4 h-4 text-slate-700" />
-                  <span>Staff</span>
+                  <ShieldCheck className="w-4 h-4 text-on-surface-variant" />
+                  <span>Staff Portal</span>
                 </Link>
               </div>
             </div>

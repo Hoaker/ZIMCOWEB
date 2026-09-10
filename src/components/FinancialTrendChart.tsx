@@ -59,14 +59,14 @@ export default function FinancialTrendChart({ memberData, transactions = [], cla
       (Number(memberData?.investmentAmount) || 0) +
       (Number(memberData?.commoditySavings) || 0) +
       (Number(memberData?.muslimSavings || memberData?.muslimCommunitySavings) || 0)
-    ) || 350000;
+    ) || 0;
 
     // Monthly baseline contribution (from sync or average)
     const monthlyRate = Number(
       memberData?.lastDeductionAmount ||
       memberData?.lastDeductionBreakdown?.total ||
       memberData?.monthlyContribution ||
-      45000
+      0
     );
 
     // Generate past 6 months (5 months ago down to 0 months ago)
@@ -106,22 +106,9 @@ export default function FinancialTrendChart({ memberData, transactions = [], cla
         });
       }
 
-      // If no explicit transactions were recorded for earlier months, estimate realistic historic flow
-      if (monthlySavings === 0) {
-        const factor = 1 - (i * 0.05); // slight progressive growth over time
-        monthlySavings = Math.round(monthlyRate * factor);
-      }
-      if (inflow === 0) {
-        inflow = Math.round(monthlySavings + (i % 2 === 0 ? 15000 : 5000));
-      }
-      if (outflow === 0) {
-        outflow = Math.round((monthlyRate * 0.3) + (i === 1 ? 25000 : 5000));
-      }
-
-      // Calculate cumulative savings backtracked from current balance
-      // Month 0 (current) = currentTotalSavings, older months back-calculated smoothly
-      const backStep = i * monthlyRate * 0.95;
-      const calculatedSavingsBalance = Math.max(50000, Math.round(currentTotalSavings - backStep));
+      // Calculate cumulative savings backtracked from current balance based strictly on real data
+      const backStep = i * monthlyRate;
+      const calculatedSavingsBalance = Math.max(0, Math.round(currentTotalSavings - backStep));
 
       months.push({
         monthKey,
@@ -133,7 +120,7 @@ export default function FinancialTrendChart({ memberData, transactions = [], cla
         inflow,
         outflow,
         totalVolume: inflow + outflow,
-        txCount: monthTxs.length || Math.max(2, 6 - i)
+        txCount: monthTxs.length
       });
     }
 

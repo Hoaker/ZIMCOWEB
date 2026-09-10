@@ -585,7 +585,7 @@ export default function WealthPlanningTool() {
                 {/* Month repayments Select Options */}
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-500 ml-1">Repayment Period</label>
-                  <div className="grid grid-cols-4 gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
                     {[3, 6, 12, 18, 24].map((mo) => (
                       <button
                         key={mo}
@@ -820,7 +820,12 @@ export default function WealthPlanningTool() {
                 {/* Sheet Title Bar */}
                 <div className="flex justify-between items-start gap-4 border-b border-slate-100 pb-5">
                   <div className="flex items-center gap-3">
-                    <img src={zimcoLogo} className="w-12 h-12 rounded-full border-2 border-emerald-600/30 object-cover" />
+                    <img 
+                      src={zimcoLogo} 
+                      alt="ZIMCO Cooperative Society Logo" 
+                      className="w-12 h-12 rounded-full border-2 border-emerald-600/30 object-cover" 
+                      referrerPolicy="no-referrer" 
+                    />
                     <div>
                       <h5 className="font-headline font-black text-emerald-950 font-bold tracking-tight text-sm">ZIMCO COOPERATIVE SOCIETY LTD</h5>
                       <span className="text-[9px] text-slate-400 font-mono font-bold">REGISTRATION NUMBER: ZIM-COOP-921-X</span>
@@ -967,7 +972,12 @@ export default function WealthPlanningTool() {
                   {/* Print Document Header */}
                   <div className="flex justify-between items-start gap-4 border-b-2 border-slate-100 pb-6">
                     <div className="flex items-center gap-4">
-                      <img src={zimcoLogo} className="w-14 h-14 rounded-full border border-emerald-600 object-cover" />
+                      <img 
+                        src={zimcoLogo} 
+                        alt="ZIMCO Cooperative Society Limited Official Logo" 
+                        className="w-14 h-14 rounded-full border border-emerald-600 object-cover" 
+                        referrerPolicy="no-referrer" 
+                      />
                       <div>
                         <h4 className="font-headline font-black text-slate-900 tracking-tight text-base sm:text-lg">ZIMCO COOPERATIVE SOCIETY LIMITED</h4>
                         <span className="text-[9px] text-slate-400 font-mono font-bold block uppercase mt-0.5">Approved under Cooperatives Societies Laws • Federal Republic of Nigeria</span>

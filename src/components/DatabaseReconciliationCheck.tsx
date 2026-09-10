@@ -937,7 +937,7 @@ export default function DatabaseReconciliationCheck({
             </div>
 
             <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left border-collapse text-xs">
+              <table className="w-full text-left border-collapse text-xs min-w-[850px]">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                     <th className="p-3">Staff ID</th>
@@ -951,8 +951,8 @@ export default function DatabaseReconciliationCheck({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-                  {omittedMembers.map((m) => (
-                    <tr key={m.id} className="hover:bg-slate-50/50 transition">
+                  {omittedMembers.map((m, mIdx) => (
+                    <tr key={`${m.id || 'omit'}-${mIdx}`} className="hover:bg-slate-50/50 transition">
                       <td className="p-3 font-mono font-bold text-purple-900">{m.id}</td>
                       <td className="p-3">
                         <p className="font-extrabold text-slate-900">{m.name}</p>
@@ -988,7 +988,7 @@ export default function DatabaseReconciliationCheck({
         ) : (
           /* VIEW: UPLOADED VS DATABASE COMPARISON TABLE */
           <div className="overflow-x-auto custom-scrollbar flex-1">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[1100px]">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                   <th className="p-3.5 w-24">Member ID</th>
@@ -1005,13 +1005,13 @@ export default function DatabaseReconciliationCheck({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
-                {displayRows.map((item) => {
+                {displayRows.map((item, itemIdx) => {
                   const hasCritical = item.status === 'critical_error';
                   const hasVariance = item.status === 'variance';
 
                   return (
                     <tr
-                      key={item.id}
+                      key={`${item.id || 'recon'}-${itemIdx}`}
                       className={`hover:bg-slate-50/80 transition-colors ${
                         hasCritical ? 'bg-rose-50/20' : hasVariance ? 'bg-amber-50/15' : ''
                       }`}

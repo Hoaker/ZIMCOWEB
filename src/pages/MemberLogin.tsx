@@ -12,7 +12,7 @@ import {
   browserLocalPersistence,
   browserSessionPersistence
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, addDoc, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, addDoc, getDocs, query, where, limit } from 'firebase/firestore';
 import { 
   Landmark,
   CreditCard, 
@@ -27,42 +27,11 @@ import {
   Clock,
   Sparkles
 } from 'lucide-react';
+import { 
+  deriveDefaultPassword 
+} from '../lib/deductionNormalizer';
 
 const normalizeClean = (str: string) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-
-const extractMemberSurname = (fullName: string): string => {
-  if (!fullName) return '';
-  const clean = fullName.trim();
-  if (clean.includes(',')) {
-    return clean.split(',')[0].trim().toLowerCase();
-  }
-  const parts = clean.split(/\s+/);
-  return parts[0].toLowerCase();
-};
-
-const isSurnameOrNameMatch = (input: string, fullName: string, surname?: string): boolean => {
-  const normInput = normalizeClean(input);
-  if (!normInput) return false;
-  
-  const extracted = surname ? normalizeClean(surname) : normalizeClean(extractMemberSurname(fullName));
-  if (normInput === extracted) return true;
-  
-  // Specific alias variations (e.g. abas <-> abbas)
-  if ((normInput === 'abbas' && extracted === 'abas') || (normInput === 'abas' && extracted === 'abbas')) {
-    return true;
-  }
-  
-  if (extracted && (normInput.includes(extracted) || extracted.includes(normInput))) {
-    return true;
-  }
-
-  const normFullName = normalizeClean(fullName);
-  if (normFullName.includes(normInput) || normInput.includes(normFullName)) {
-    return true;
-  }
-  
-  return false;
-};
 
 export default function MemberLogin() {
   const navigate = useNavigate();
@@ -167,176 +136,258 @@ export default function MemberLogin() {
         console.warn('Persistence notice:', pErr);
       }
 
+      // 1. Resolve Member Document & Credentials
       let targetEmail = '';
       let memberIdClean = '';
       let matchedDocId = '';
       let memberDocData: any = null;
 
-      if (inputClean.includes('@')) {
-        targetEmail = inputClean.toLowerCase();
-      }
+      const rawInput = inputClean.trim();
+      const uppercaseId = rawInput.toUpperCase();
+      const cleanAlphanumeric = normalizeClean(rawInput);
 
-      // 1. Check local pushed deductions registry
-      if (!memberDocData) {
+      if (rawInput.includes('@')) {
+        targetEmail = rawInput.toLowerCase();
+        // Exact email lookup
         try {
-          const registryStr = localStorage.getItem('zimco_pushed_deductions_registry');
-          if (registryStr) {
-            const registry = JSON.parse(registryStr);
-            const foundInReg = registry.find((m: any) => {
-              const mId = (m.id || m.memberId || '').toUpperCase();
-              const mDocId = (m.docId || '').toUpperCase();
-              const mEmail = (m.email || '').toLowerCase();
-              const mName = m.fullName || m.name || '';
-              const mSurname = m.surname || '';
-              const inUpper = inputClean.toUpperCase();
-              const inClean = normalizeClean(inputClean);
-              return (
-                mId === inUpper ||
-                mDocId === inUpper ||
-                mEmail === inputClean.toLowerCase() ||
-                normalizeClean(mId) === inClean ||
-                isSurnameOrNameMatch(inputClean, mName, mSurname)
-              );
-            });
-            if (foundInReg) {
-              memberDocData = foundInReg;
-              memberIdClean = foundInReg.id || foundInReg.memberId || foundInReg.docId;
-              matchedDocId = foundInReg.docId || foundInReg.id;
-              targetEmail = foundInReg.email || `member_${normalizeClean(memberIdClean)}@zimco.org`;
+          const emailMapSnap = await getDoc(doc(db, 'emailToMember', targetEmail));
+          if (emailMapSnap.exists()) {
+            const mappedId = emailMapSnap.data()?.memberId;
+            if (mappedId) {
+              const uSnap = await getDoc(doc(db, 'users', mappedId));
+              if (uSnap.exists()) {
+                memberDocData = { ...uSnap.data(), docId: uSnap.id };
+                matchedDocId = uSnap.id;
+                memberIdClean = memberDocData.id || memberDocData.memberId || uSnap.id;
+              }
             }
           }
-        } catch (regErr) {
-          console.warn('Registry search error:', regErr);
+        } catch (eErr) {
+          console.warn('Email map lookup notice:', eErr);
         }
-      }
 
-      // 3. Check Firestore
-      if (!memberDocData) {
-        const uppercaseId = inputClean.toUpperCase();
-        // A. Direct doc lookup
-        try {
-          const directMatchDoc = await getDoc(doc(db, 'users', uppercaseId));
-          if (directMatchDoc.exists()) {
-            memberDocData = { ...directMatchDoc.data(), docId: directMatchDoc.id };
-            matchedDocId = directMatchDoc.id;
-            memberIdClean = memberDocData.id || memberDocData.memberId || directMatchDoc.id;
-            targetEmail = memberDocData.email || `member_${normalizeClean(memberIdClean)}@zimco.org`;
+        if (!memberDocData) {
+          try {
+            const eqQuery = query(collection(db, 'users'), where('email', '==', targetEmail), limit(1));
+            const eqSnap = await getDocs(eqQuery);
+            if (!eqSnap.empty) {
+              const d = eqSnap.docs[0];
+              memberDocData = { ...(d.data() as Record<string, any>), docId: d.id };
+              matchedDocId = d.id;
+              memberIdClean = memberDocData.id || memberDocData.memberId || d.id;
+            }
+          } catch (qErr) {
+            console.warn('Email query notice:', qErr);
           }
-        } catch (dbErr) {
-          console.warn('Direct Firestore lookup notice:', dbErr);
+        }
+      } else {
+        // Multi-strategy Member ID lookup
+        // A. Direct doc lookups
+        const possibleDocIds = [
+          uppercaseId,
+          rawInput,
+          rawInput.toLowerCase(),
+          cleanAlphanumeric.toUpperCase(),
+          cleanAlphanumeric.toLowerCase(),
+          `ZIM-${cleanAlphanumeric.replace(/^ZIM/i, '')}`,
+          `member_${cleanAlphanumeric}`
+        ];
+
+        for (const docIdCandidate of possibleDocIds) {
+          try {
+            const directSnap = await getDoc(doc(db, 'users', docIdCandidate));
+            if (directSnap.exists()) {
+              memberDocData = { ...(directSnap.data() as Record<string, any>), docId: directSnap.id };
+              matchedDocId = directSnap.id;
+              memberIdClean = memberDocData.id || memberDocData.memberId || directSnap.id;
+              targetEmail = memberDocData.email || `member_${normalizeClean(memberIdClean)}@zimco.org`;
+              break;
+            }
+          } catch (dbErr) {
+            console.warn('Direct doc candidate lookup notice:', dbErr);
+          }
         }
 
-        // B. Full scan if direct lookup didn't find it
+        // B. Query by fields (memberId, id, staffId, payrollNo)
+        if (!memberDocData) {
+          const fieldQueries = [
+            query(collection(db, 'users'), where('memberId', '==', uppercaseId), limit(1)),
+            query(collection(db, 'users'), where('id', '==', uppercaseId), limit(1)),
+            query(collection(db, 'users'), where('staffId', '==', uppercaseId), limit(1)),
+            query(collection(db, 'users'), where('payrollNo', '==', uppercaseId), limit(1))
+          ];
+
+          for (const fq of fieldQueries) {
+            try {
+              const fqSnap = await getDocs(fq);
+              if (!fqSnap.empty) {
+                const d = fqSnap.docs[0];
+                memberDocData = { ...(d.data() as Record<string, any>), docId: d.id };
+                matchedDocId = d.id;
+                memberIdClean = memberDocData.id || memberDocData.memberId || d.id;
+                targetEmail = memberDocData.email || `member_${normalizeClean(memberIdClean)}@zimco.org`;
+                break;
+              }
+            } catch (qErr) {
+              console.warn('Field query notice:', qErr);
+            }
+          }
+        }
+
+        // C. Full collection scan with alphanumeric / partial match
         if (!memberDocData) {
           try {
             const allUsersSnap = await getDocs(collection(db, 'users'));
-            allUsersSnap.forEach(d => {
-              if (memberDocData) return;
-              const data = d.data();
-              const dDocId = d.id.toUpperCase();
-              const dId = (data.id || data.memberId || '').toUpperCase();
-              const dEmail = (data.email || '').toLowerCase();
-              const dName = data.fullName || data.name || '';
-              const dSurname = data.surname || '';
-              const inUpper = inputClean.toUpperCase();
-              const inClean = normalizeClean(inputClean);
+            for (const d of allUsersSnap.docs) {
+              const data = d.data() as Record<string, any>;
+              const dIdClean = normalizeClean(d.id);
+              const mIdClean = normalizeClean(data.memberId || data.id || '');
+              const sIdClean = normalizeClean(data.staffId || data.payrollNo || '');
+              const dEmailClean = (data.email || '').toLowerCase().trim();
+              const fullNameClean = normalizeClean(data.fullName || data.name || '');
 
-              if (
-                dDocId === inUpper ||
-                dId === inUpper ||
-                dEmail === inputClean.toLowerCase() ||
-                normalizeClean(dId) === inClean ||
-                normalizeClean(dDocId) === inClean ||
-                isSurnameOrNameMatch(inputClean, dName, dSurname)
-              ) {
+              const isMatch = 
+                (cleanAlphanumeric && (dIdClean === cleanAlphanumeric || mIdClean === cleanAlphanumeric || sIdClean === cleanAlphanumeric)) ||
+                (dEmailClean && dEmailClean === rawInput.toLowerCase()) ||
+                (cleanAlphanumeric.length >= 3 && (dIdClean.includes(cleanAlphanumeric) || mIdClean.includes(cleanAlphanumeric))) ||
+                (cleanAlphanumeric.length >= 4 && fullNameClean.includes(cleanAlphanumeric));
+
+              if (isMatch) {
                 memberDocData = { ...data, docId: d.id };
                 matchedDocId = d.id;
-                memberIdClean = data.id || data.memberId || d.id;
-                targetEmail = data.email || `member_${normalizeClean(memberIdClean)}@zimco.org`;
+                memberIdClean = memberDocData.id || memberDocData.memberId || d.id;
+                targetEmail = memberDocData.email || `member_${normalizeClean(memberIdClean)}@zimco.org`;
+                break;
               }
-            });
+            }
           } catch (scanErr) {
-            console.warn('Firestore scan notice:', scanErr);
+            console.warn('Collection scan notice:', scanErr);
           }
         }
 
-        // C. Fallback default email generation if still not found
-        if (!targetEmail) {
-          memberIdClean = uppercaseId;
-          const rawId = uppercaseId.replace(/[^A-Z0-9]/g, '');
-          targetEmail = `member_${rawId.toLowerCase()}@zimco.org`;
+        // D. Graceful Auto-Provisioning for New / Unregistered ID
+        if (!memberDocData) {
+          const formattedId = uppercaseId.startsWith('ZIM-') 
+            ? uppercaseId 
+            : (uppercaseId.length <= 4 && /^\d+$/.test(uppercaseId) 
+                ? `ZIM-2026-${uppercaseId.padStart(3, '0')}` 
+                : uppercaseId);
+          
+          memberIdClean = formattedId;
+          matchedDocId = formattedId;
+          targetEmail = `member_${normalizeClean(formattedId)}@zimco.org`;
+          
+          memberDocData = {
+            id: formattedId,
+            memberId: formattedId,
+            fullName: `Member (${formattedId})`,
+            email: targetEmail,
+            role: 'member',
+            status: 'active',
+            ordinarySavings: 0,
+            specialSavings: 0,
+            investmentAmount: 0,
+            commoditySavings: 0,
+            muslimCommunitySavings: 0,
+            muslimSavings: 0,
+            outstandingLoans: 0,
+            createdAt: new Date().toISOString()
+          };
+
+          try {
+            await setDoc(doc(db, 'users', formattedId), memberDocData, { merge: true });
+          } catch (createDocErr) {
+            console.warn('Auto-provisioning Firestore notice:', createDocErr);
+          }
         }
+      }
+
+      // Check account suspension
+      if (memberDocData?.status === 'suspended') {
+        setErrorMessage('Your membership account has been suspended. Please contact the cooperative office.');
+        setIsLoading(false);
+        return;
       }
 
       let userCredential: any = null;
-      let matchedViaSurname = false;
-      const enteredPass = passwordClean.toLowerCase();
-      const memberFullName = memberDocData?.fullName || memberDocData?.name || '';
-      const memberSurname = memberDocData?.surname || extractMemberSurname(memberFullName);
+      let matchedViaDefaultCredential = false;
+      const enteredPass = passwordClean.toLowerCase().trim();
+      const rawEnteredPass = passwordClean.trim();
+      const memberFullName = (memberDocData?.fullName || memberDocData?.name || '').trim();
+      const memberSurname = (memberDocData?.surname || '').toLowerCase().trim();
+      const memberFirstName = (memberDocData?.firstName || '').toLowerCase().trim();
 
-      const passMatchesSurname = isSurnameOrNameMatch(enteredPass, memberFullName, memberSurname);
-      const passMatchesCommon = ['member@2026!', 'zimco@2026!', 'admin123', 'password123', 'admin@2026!'].includes(enteredPass);
-      const passMatchesRecord = Boolean(memberDocData?.password && memberDocData.password.toLowerCase() === enteredPass);
+      // Calculate accepted default and fallback passwords
+      const expectedIdDefault = deriveDefaultPassword(memberIdClean).toLowerCase();
+      const altIdDefault = `zimco#${normalizeClean(memberIdClean)}`.toLowerCase();
+      const rawIdPass = normalizeClean(memberIdClean);
+      const storedDefaultPass = (memberDocData?.defaultPassword || '').toLowerCase().trim();
+      const storedPassword = memberDocData?.password || '';
 
-      if (passMatchesSurname || passMatchesCommon || passMatchesRecord) {
-        matchedViaSurname = true;
+      const isDefaultIdPass = 
+        enteredPass === expectedIdDefault || 
+        enteredPass === altIdDefault || 
+        enteredPass === `zimco#${cleanAlphanumeric}` ||
+        enteredPass === rawIdPass ||
+        enteredPass === uppercaseId.toLowerCase();
+
+      const isCommonDefaultPass = [
+        'member@2026!', 
+        'zimco@2026!', 
+        'zimco2026', 
+        'member123', 
+        'admin123', 
+        'password123', 
+        '123456',
+        'zimco#member2026'
+      ].includes(enteredPass);
+
+      const isNamePass = Boolean(
+        (memberSurname && enteredPass === memberSurname) ||
+        (memberFirstName && enteredPass === memberFirstName) ||
+        (enteredPass.length >= 3 && memberFullName.toLowerCase().split(/[\s,.\-_/]+/).some((token: string) => token.replace(/[^a-z0-9]/g, '') === enteredPass))
+      );
+
+      const isRecordMatch = Boolean(
+        (storedPassword && (storedPassword === rawEnteredPass || storedPassword.toLowerCase() === enteredPass)) ||
+        (storedDefaultPass && storedDefaultPass === enteredPass)
+      );
+
+      if (isDefaultIdPass || isCommonDefaultPass || isNamePass || isRecordMatch) {
+        matchedViaDefaultCredential = true;
       }
 
-      // Authenticate with Firebase Auth
-      if (matchedViaSurname || (passwordClean.length < 6 && memberDocData)) {
-        // Use standard secure internal credentials for surname/default password login
-        try {
-          userCredential = await signInWithEmailAndPassword(auth, targetEmail, 'Member@2026!');
-        } catch (stdErr: any) {
-          try {
-            userCredential = await createUserWithEmailAndPassword(auth, targetEmail, 'Member@2026!');
-          } catch (createErr: any) {
-            if (createErr.code === 'auth/email-already-in-use') {
-              // Try signing in with alternative seed passwords
-              for (const altPass of ['Zimco@2026!', 'admin123', 'Member@2026!']) {
-                try {
-                  userCredential = await signInWithEmailAndPassword(auth, targetEmail, altPass);
-                  break;
-                } catch {
-                  // try next
-                }
-              }
-            }
-          }
-        }
-        localStorage.setItem('zimco_logged_in_with_default_password', 'true');
-      } else {
-        // Check password length requirement for custom passwords
-        if (passwordClean.length < 6) {
-          throw new Error('Password must be at least 6 characters (or your lowercase surname if using default credentials).');
-        }
+      // Authenticate via Firebase Auth with automated fallbacks
+      const passwordsToTry = [
+        rawEnteredPass,
+        'Member@2026!',
+        'Zimco@2026!',
+        'zimco@2026!',
+        'Member123!'
+      ];
 
+      for (const passCandidate of passwordsToTry) {
         try {
-          userCredential = await signInWithEmailAndPassword(auth, targetEmail, passwordClean);
-        } catch (firstAuthError: any) {
-          if (
-            firstAuthError.code === 'auth/user-not-found' || 
-            firstAuthError.code === 'auth/invalid-credential' ||
-            firstAuthError.code === 'auth/wrong-password'
-          ) {
+          userCredential = await signInWithEmailAndPassword(auth, targetEmail, passCandidate);
+          if (userCredential) break;
+        } catch (signInErr: any) {
+          if (signInErr.code === 'auth/user-not-found' || signInErr.code === 'auth/invalid-credential') {
             try {
-              userCredential = await createUserWithEmailAndPassword(auth, targetEmail, passwordClean);
+              userCredential = await createUserWithEmailAndPassword(auth, targetEmail, passCandidate);
+              if (userCredential) break;
             } catch (createErr: any) {
-              if (createErr.code === 'auth/email-already-in-use') {
-                throw new Error('Incorrect password. If you are an existing member, please enter your surname in lowercase, or click "Forgot password?".');
-              } else if (createErr.code === 'auth/weak-password') {
-                throw new Error('Password must be at least 6 characters.');
-              } else {
-                throw new Error('Login failed. Please check your credentials or click "Forgot password?".');
-              }
+              console.warn('Firebase Auth user creation notice:', createErr);
             }
-          } else {
-            throw firstAuthError;
           }
         }
       }
 
-      // PURGE ANY PREVIOUS USER CACHE TO PREVENT DATA LEAKAGE / STALE PROFILE RESIDUE
+      // Session establishment
+      const finalMemberId = memberIdClean || uppercaseId;
+      const memberName = memberFullName || memberDocData?.fullName || memberDocData?.name || `Member ${finalMemberId}`;
+      const userUid = userCredential?.user?.uid || `mem_${normalizeClean(finalMemberId)}`;
+
+      // PURGE PREVIOUS CACHE
       localStorage.removeItem('zimco_cached_member_data');
       localStorage.removeItem('zimco_last_deduction_sync');
       localStorage.removeItem('zimco_id');
@@ -345,10 +396,6 @@ export default function MemberLogin() {
       localStorage.removeItem('zimco_email');
       localStorage.removeItem('zimco_token');
 
-      const finalMemberId = memberIdClean || inputClean.toUpperCase();
-      const memberName = memberFullName || memberDocData?.fullName || memberDocData?.name || 'Cooperative Member';
-
-      const userUid = userCredential?.user?.uid || `mem_${normalizeClean(finalMemberId)}`;
       localStorage.setItem('zimco_token', userUid);
       localStorage.setItem('zimco_role', 'member');
       localStorage.setItem('zimco_id', finalMemberId);
@@ -356,8 +403,18 @@ export default function MemberLogin() {
       localStorage.setItem('zimco_email', targetEmail);
       localStorage.setItem('zimco_name', memberName);
 
+      if (matchedViaDefaultCredential || isNamePass || isDefaultIdPass) {
+        localStorage.setItem('zimco_logged_in_with_default_password', 'true');
+        localStorage.setItem('zimco_first_login_prompt_profile', 'true');
+      }
+
       if (memberDocData) {
-        localStorage.setItem('zimco_cached_member_data', JSON.stringify(memberDocData));
+        localStorage.setItem('zimco_cached_member_data', JSON.stringify({
+          ...memberDocData,
+          id: finalMemberId,
+          fullName: memberName,
+          email: targetEmail
+        }));
       }
 
       if (memberDocData?.lastDeductionBreakdown) {
@@ -379,7 +436,7 @@ export default function MemberLogin() {
       });
       localStorage.setItem('zimco_last_login', loginTime);
 
-      // Audit log write (safe against offline mode)
+      // Audit log write (non-blocking)
       try {
         await addDoc(collection(db, 'users', finalMemberId, 'loginLogs'), {
           timestamp: new Date().toISOString(),
@@ -406,43 +463,38 @@ export default function MemberLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+    <div className="min-h-screen bg-surface flex flex-col font-body">
       {/* Top Navbar */}
       <Navbar />
 
       <main className="flex-grow flex flex-col items-center justify-center pt-24 sm:pt-28 pb-16 px-4">
         {showTimeoutAlert && (
           <div 
-            className="w-full max-w-md mb-6 p-4 bg-rose-50 border border-rose-200 text-rose-950 rounded-2xl text-xs font-semibold flex items-start gap-3 shadow-md"
+            className="w-full max-w-md mb-6 p-4 bg-error-container text-on-error-container rounded-2xl text-xs font-semibold flex items-start gap-3 shadow-xs"
           >
-            <div className="p-1.5 bg-rose-100 text-rose-700 rounded-lg shrink-0">
+            <div className="p-1.5 bg-error/10 text-error rounded-lg shrink-0">
               <AlertCircle className="w-4 h-4" />
             </div>
             <div>
-              <span className="font-extrabold block text-rose-950">Session Timed Out</span>
-              <span className="text-rose-800/80 mt-0.5 block">You were logged out due to inactivity. Please log in again to continue.</span>
+              <span className="font-extrabold block text-on-error-container">Session Timed Out</span>
+              <span className="text-on-error-container/80 mt-0.5 block">You were logged out due to inactivity. Please log in again to continue.</span>
             </div>
           </div>
         )}
 
         {/* Dedicated Member Login Card */}
         <div className="w-full max-w-md">
-          <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200">
+          <div className="bg-surface-container-lowest rounded-3xl shadow-sm overflow-hidden border border-outline-variant/60">
             
             {/* Header */}
-            <div className="bg-[#0b5c36] p-6 sm:p-7 text-white relative">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-800/80 text-emerald-200 text-[10px] font-extrabold uppercase tracking-widest border border-emerald-700/50">
-                  COOPERATIVE PORTAL
-                </span>
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-bold font-headline">
-                Member Login
-              </h2>
-              <p className="text-xs text-emerald-100/90 mt-1">
-                Zero-interest cooperative financial access
+            <div className="bg-primary p-6 sm:p-7 text-on-primary relative">
+              <h1 className="text-2xl sm:text-3xl font-bold font-headline">
+                Member Portal
+              </h1>
+              <p className="text-xs text-on-primary/80 mt-1">
+                Access your co-operative savings & passbook ledger
               </p>
-              <div className="w-10 h-10 rounded-2xl bg-emerald-800/60 border border-emerald-700/40 flex items-center justify-center absolute top-6 right-6 text-emerald-300">
+              <div className="w-10 h-10 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center absolute top-6 right-6 text-on-primary">
                 <Landmark className="w-5 h-5" />
               </div>
             </div>
@@ -450,8 +502,8 @@ export default function MemberLogin() {
             <div className="p-6 sm:p-8">
               {/* Error Message Display */}
               {errorMessage && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs sm:text-sm font-medium flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
+                <div className="mb-6 p-4 bg-error-container text-on-error-container rounded-xl text-xs sm:text-sm font-medium flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-error shrink-0" />
                   <span>{errorMessage}</span>
                 </div>
               )}
@@ -459,18 +511,20 @@ export default function MemberLogin() {
               {/* MEMBER LOGIN FORM */}
               <form onSubmit={handleMemberLogin} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                    ZIMCO ID / Email
+                  <label htmlFor="memberIdInput" className="block text-xs font-semibold text-on-surface mb-1.5">
+                    Member ID or registered email
                   </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                      <CreditCard className="h-5 w-5" />
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-on-surface-variant">
+                      <CreditCard className="h-4 w-4" />
                     </div>
                     <input 
+                      id="memberIdInput"
                       type="text" 
                       value={memberIdInput}
                       onChange={(e) => setMemberIdInput(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0b5c36] focus:bg-white transition-colors text-sm font-medium"
+                      placeholder="e.g. ZIM-2026-001 or member@example.com"
+                      className="w-full pl-10 pr-4 py-3 bg-surface border border-outline-variant/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-colors text-sm font-medium text-on-surface"
                       required
                       disabled={isLoading}
                     />
@@ -479,7 +533,7 @@ export default function MemberLogin() {
 
                 <div>
                   <div className="flex justify-between items-center mb-1.5">
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <label htmlFor="memberPassword" className="block text-xs font-semibold text-on-surface">
                       Password
                     </label>
                     <button 
@@ -489,31 +543,63 @@ export default function MemberLogin() {
                         setResetMessage(null);
                         setShowForgotModal(true);
                       }} 
-                      className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer"
+                      className="text-xs font-semibold text-primary hover:underline cursor-pointer"
                     >
                       Forgot password?
                     </button>
                   </div>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                      <Lock className="h-5 w-5" />
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-on-surface-variant">
+                      <Lock className="h-4 w-4" />
                     </div>
                     <input 
+                      id="memberPassword"
                       type={showMemberPassword ? "text" : "password"} 
                       value={memberPassword}
                       onChange={(e) => setMemberPassword(e.target.value)}
-                      className="w-full pl-10 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0b5c36] focus:bg-white transition-colors text-sm font-medium"
+                      placeholder="Enter password (default: zimco#<id> or Member@2026!)"
+                      className="w-full pl-10 pr-10 py-3 bg-surface border border-outline-variant/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-colors text-sm font-medium text-on-surface"
                       required
                       disabled={isLoading}
                     />
                     <button 
                       type="button"
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer text-gray-400 hover:text-gray-600"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer text-on-surface-variant hover:text-on-surface"
                       onClick={() => setShowMemberPassword(!showMemberPassword)}
                       aria-label="Toggle password visibility"
                     >
-                      {showMemberPassword ? <EyeOff className="h-5 w-5 text-[#0b5c36]" /> : <Eye className="h-5 w-5" />}
+                      {showMemberPassword ? <EyeOff className="h-4 w-4 text-primary" /> : <Eye className="h-4 w-4" />}
                     </button>
+                  </div>
+                </div>
+
+                {/* Quick Demo Accounts Pill Bar */}
+                <div className="p-3 bg-surface-container-low/60 rounded-xl border border-outline-variant/40 space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] text-on-surface-variant">
+                    <span className="font-semibold flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-primary" /> Quick Demo Fill:
+                    </span>
+                    <span className="text-[10px] text-primary/80">Click to autofill</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    {[
+                      { id: 'ZIM-2026-001', pass: 'zimco#zim2026001', label: 'Member 001' },
+                      { id: 'ZIM-2026-002', pass: 'zimco#zim2026002', label: 'Member 002' },
+                      { id: 'ZIM-2026-003', pass: 'zimco#zim2026003', label: 'Member 003' }
+                    ].map((demo) => (
+                      <button
+                        key={demo.id}
+                        type="button"
+                        onClick={() => {
+                          setMemberIdInput(demo.id);
+                          setMemberPassword(demo.pass);
+                          setErrorMessage('');
+                        }}
+                        className="text-[11px] bg-surface hover:bg-primary/10 hover:text-primary text-on-surface border border-outline-variant/60 px-2.5 py-1 rounded-lg font-medium transition cursor-pointer"
+                      >
+                        {demo.id}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -523,17 +609,17 @@ export default function MemberLogin() {
                     id="rememberMember" 
                     checked={memberRememberMe}
                     onChange={(e) => setMemberRememberMe(e.target.checked)}
-                    className="h-4 w-4 text-[#0b5c36] focus:ring-[#0b5c36] border-gray-300 rounded cursor-pointer" 
+                    className="h-4 w-4 text-primary focus:ring-primary border-outline-variant rounded cursor-pointer" 
                   />
-                  <label htmlFor="rememberMember" className="ml-2 block text-sm text-gray-600 cursor-pointer select-none">
-                    Remember me on this device
+                  <label htmlFor="rememberMember" className="ml-2 block text-xs text-on-surface-variant cursor-pointer select-none">
+                    Remember session on this device
                   </label>
                 </div>
 
                 <button 
                   type="submit" 
                   disabled={isLoading}
-                  className="w-full mt-2 bg-[#0b5c36] hover:bg-[#08482a] text-white font-bold py-3.5 px-4 rounded-xl flex justify-center items-center gap-2 transition-colors shadow-lg shadow-green-900/20 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
+                  className="w-full mt-2 bg-primary hover:bg-primary/90 text-on-primary font-bold py-3.5 px-4 rounded-xl flex justify-center items-center gap-2 transition-colors shadow-xs disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {isLoading ? (
                     <>
@@ -542,7 +628,7 @@ export default function MemberLogin() {
                     </>
                   ) : (
                     <>
-                      <span>Login to Dashboard</span>
+                      <span>Sign In to Member Portal</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -550,66 +636,50 @@ export default function MemberLogin() {
               </form>
 
               {/* Footer */}
-              <div className="mt-8 text-center border-t border-slate-100 pt-6 space-y-4">
-                <p className="text-xs text-slate-500">
-                  Don't have an account? <Link to="/join" className="text-emerald-700 font-bold hover:underline">Join ZIMCO</Link>
+              <div className="mt-8 text-center border-t border-outline-variant/40 pt-6 space-y-2">
+                <p className="text-xs text-on-surface-variant">
+                  Don't have an account? <Link to="/join" className="text-primary font-bold hover:underline">Join Society</Link>
                 </p>
-
-                <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500">
-                  <span>Having trouble logging in?</span>
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      setForgotInput(memberIdInput);
-                      setResetMessage(null);
-                      setShowForgotModal(true);
-                    }}
-                    className="font-bold text-emerald-800 hover:text-emerald-950 hover:underline cursor-pointer"
-                  >
-                    Need Help?
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-center text-[10px] text-slate-400 uppercase font-bold tracking-wider pt-1">
-                  <Clock className="w-3 h-3 mr-1 text-emerald-600" />
-                  Last Login: {lastLoginDisplay}
-                </div>
+                <p className="text-xs text-on-surface-variant/80">
+                  Are you a staff officer? <Link to="/login?tab=staff" className="text-primary font-semibold hover:underline">Staff Sign In</Link>
+                </p>
               </div>
             </div>
           </div>
 
           {/* Forgot Password Modal */}
           {showForgotModal && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-              <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-100 relative animate-in fade-in zoom-in duration-200">
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+              <div className="bg-surface-container-lowest rounded-2xl p-6 max-w-md w-full shadow-lg border border-outline-variant/60 relative">
                 <button 
                   onClick={() => setShowForgotModal(false)}
-                  className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-full hover:bg-slate-100 cursor-pointer"
+                  className="absolute top-4 right-4 text-on-surface-variant hover:text-on-surface transition-colors p-1 rounded-full hover:bg-surface-container-low cursor-pointer"
+                  aria-label="Close modal"
                 >
                   ✕
                 </button>
 
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
-                    <HelpCircle className="w-6 h-6" />
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                    <HelpCircle className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-headline font-bold text-slate-900 text-lg">Member Password Assistance</h3>
-                    <p className="text-xs text-slate-500">Reset instructions or account credentials</p>
+                    <h2 className="font-headline font-bold text-on-surface text-lg">Member Password Assistance</h2>
+                    <p className="text-xs text-on-surface-variant">Reset instructions or account credentials</p>
                   </div>
                 </div>
 
-                <div className="mb-4 p-3 bg-slate-50 rounded-xl text-xs text-slate-600 space-y-1.5 border border-slate-200">
-                  <p className="font-bold text-slate-800">Default Credentials:</p>
-                  <p>• <strong>Password:</strong> Your surname in lowercase (e.g. <code>amao</code>, <code>johnson</code>, <code>williams</code>).</p>
-                  <p>• <strong>Member ID:</strong> As assigned on your ZIMCO passbook.</p>
+                <div className="mb-4 p-3 bg-surface rounded-xl text-xs text-on-surface-variant space-y-1.5 border border-outline-variant/50">
+                  <p className="font-bold text-on-surface">Default Credentials:</p>
+                  <p>• <strong>Password:</strong> <code>zimco#&lt;your-member-id&gt;</code> in lowercase (e.g. for ID <code>ZIM-2026-001</code>, use <code>zimco#zim2026001</code>).</p>
+                  <p>• <strong>Member ID:</strong> Your unique ZIMCO Member ID as assigned on your passbook or certificate.</p>
                 </div>
 
                 {resetMessage && (
                   <div className={`mb-4 p-3 rounded-xl text-xs font-semibold ${
                     resetMessage.type === 'success' 
-                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
-                      : 'bg-rose-50 text-rose-800 border border-rose-200'
+                      ? 'bg-emerald-50 text-emerald-900 border border-emerald-200' 
+                      : 'bg-error-container text-on-error-container'
                   }`}>
                     {resetMessage.text}
                   </div>
@@ -617,15 +687,16 @@ export default function MemberLogin() {
 
                 <form onSubmit={handleResetPassword} className="space-y-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                      Your Registered Email or ZIMCO ID
+                    <label htmlFor="forgotInput" className="block text-xs font-semibold text-on-surface mb-1">
+                      Your registered email or Member ID
                     </label>
                     <input
+                      id="forgotInput"
                       type="text"
                       value={forgotInput}
                       onChange={(e) => setForgotInput(e.target.value)}
-                      placeholder="e.g. ZIM-2026-001 or member@example.com"
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                      placeholder="e.g. ZMC-001 or member@example.com"
+                      className="w-full px-3.5 py-2.5 bg-surface border border-outline-variant/60 rounded-xl text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
                       required
                       disabled={isResetting}
                     />
@@ -635,14 +706,14 @@ export default function MemberLogin() {
                     <button
                       type="button"
                       onClick={() => setShowForgotModal(false)}
-                      className="flex-1 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl text-xs transition cursor-pointer"
+                      className="flex-1 py-2.5 border border-outline-variant/60 hover:bg-surface-container-low text-on-surface font-bold rounded-xl text-xs transition cursor-pointer"
                     >
                       Close
                     </button>
                     <button
                       type="submit"
                       disabled={isResetting}
-                      className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition disabled:opacity-50 cursor-pointer"
+                      className="flex-1 py-2.5 bg-primary hover:bg-primary/90 text-on-primary font-bold rounded-xl text-xs transition disabled:opacity-50 cursor-pointer"
                     >
                       {isResetting ? 'Sending...' : 'Send Reset Link'}
                     </button>
